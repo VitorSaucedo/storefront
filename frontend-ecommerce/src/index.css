@@ -1,0 +1,479 @@
+@import url("https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap");
+
+/* --- Resets e Estrutura Base --- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --bg: #0a0a0f;
+  --surface: #111118;
+  --surface2: #1a1a24;
+  --border: #2a2a3a;
+  --accent: #7c6aff;
+  --accent2: #ff6a9b;
+  --accent3: #6affb8;
+  --text: #f0f0f8;
+  --text2: #8888aa;
+  --text3: #555570;
+  --danger: #ff4466;
+  --warning: #ffaa44;
+  --success: #44ffaa;
+  --r: 12px;
+  --r-sm: 8px;
+  --sidebar-width: 240px; /* Aumentei um pouco a largura da sidebar para equilíbrio */
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: "DM Sans", sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: "Syne", sans-serif;
+  line-height: 1.2;
+}
+
+/* --- Layout Principal (AQUI ESTÁ A MUDANÇA) --- */
+.app-layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+.main-content {
+  flex: 1;
+  margin-left: var(--sidebar-width);
+  min-height: 100vh;
+  transition: margin-left 0.3s ease;
+  width: 100%;
+
+  /* AJUSTE: Removemos o align-items: center e usamos flex-start */
+  padding: 48px 64px; /* Mais espaço nas laterais e topo */
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+/* Container agora "ancorado" à esquerda mas com limite de expansão */
+.main-container {
+  width: 100%;
+  max-width: 1400px; /* Mais amplitude para o grid */
+  margin: 0; /* Remove o margin: 0 auto */
+}
+
+/* --- StorePage & Outras Telas --- */
+.store-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 48px;
+  align-items: center;
+  width: 100%;
+}
+
+.store-nav {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 32px;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.filter-group {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.search-input {
+  max-width: 320px; /* Busca um pouco maior */
+}
+
+/* --- Typography Helpers --- */
+.syne-title {
+  font-size: 32px; /* Títulos um pouco mais imponentes */
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+
+.subtitle {
+  color: var(--text2);
+  font-size: 14px;
+}
+
+/* --- Grid de Produtos (Mais colunas no Desktop) --- */
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 20px;
+  width: 100%;
+}
+
+/* --- Botões de Filtro --- */
+.filter-btn {
+  padding: 8px 18px;
+  border-radius: 100px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text2);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.filter-btn:hover {
+  border-color: var(--accent);
+  color: var(--text);
+  background: var(--surface2);
+}
+
+.filter-btn.active {
+  background: rgba(124, 106, 255, 0.15);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* --- Status & Modais --- */
+.modal-status-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  text-align: center;
+  padding: 10px 0;
+}
+
+/* --- Badge do Carrinho --- */
+.cart-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  background: var(--accent2);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  border: 2px solid var(--bg);
+}
+
+.relative-btn {
+  position: relative;
+}
+
+/* --- Inputs e Scrollbar --- */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: var(--surface);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 10px;
+}
+
+input,
+select,
+textarea {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  color: var(--text);
+  padding: 12px 16px;
+  transition: all 0.2s;
+}
+
+input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px rgba(124, 106, 255, 0.1);
+}
+
+/* --- Media Queries --- */
+@media (max-width: 1024px) {
+  :root {
+    --sidebar-width: 220px;
+  }
+  .main-content {
+    padding: 40px;
+  }
+}
+
+@media (max-width: 768px) {
+  :root {
+    --sidebar-width: 0px;
+  }
+
+  .main-content {
+    margin-left: 0;
+    padding: 24px 16px !important;
+    align-items: stretch; /* Volta a centralizar/esticar no mobile */
+  }
+
+  .store-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 20px;
+  }
+
+  .product-grid {
+    grid-template-columns: 1fr;
+  }
+  .search-input {
+    max-width: 100%;
+  }
+}
+
+@media (min-width: 1366px) {
+  :root {
+    --sidebar-width: 280px;
+  }
+
+  body {
+    font-size: 15px;
+  }
+
+  .main-content {
+    padding: 64px 80px;
+  }
+
+  .main-container {
+    max-width: 1600px;
+  }
+
+  .product-grid {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 24px;
+  }
+
+  .syne-title {
+    font-size: 36px;
+  }
+}
+
+@media (min-width: 1920px) {
+  :root {
+    --sidebar-width: 320px;
+  }
+
+  body {
+    font-size: 16px;
+  }
+
+  .main-content {
+    padding: 80px 100px;
+  }
+
+  .main-container {
+    max-width: 2000px;
+  }
+
+  .product-grid {
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 40px;
+  }
+
+  .store-header {
+    margin-bottom: 64px;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+}
+
+/* --- Component Styles --- */
+.product-image {
+  height: 180px;
+}
+
+@media (min-width: 1366px) {
+  .product-image {
+    height: 200px;
+  }
+}
+
+@media (min-width: 1920px) {
+  .product-image {
+    height: 220px;
+  }
+}
+
+.sidebar-inner {
+  padding: 24px 16px;
+}
+
+@media (min-width: 1920px) {
+  .sidebar-inner {
+    padding: 32px 20px;
+  }
+}
+
+.page-container {
+  padding: 32px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+@media (min-width: 1366px) {
+  .page-container {
+    max-width: 1600px;
+  }
+}
+
+@media (min-width: 1920px) {
+  .page-container {
+    max-width: 2000px;
+  }
+}
+
+.payments-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 16px;
+}
+
+@media (min-width: 1366px) {
+  .payments-grid {
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 20px;
+  }
+}
+
+@media (min-width: 1920px) {
+  .payments-grid {
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    gap: 24px;
+  }
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+@media (min-width: 1366px) {
+  .summary-grid {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 16px;
+  }
+}
+
+@media (min-width: 1920px) {
+  .summary-grid {
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 20px;
+  }
+}
+
+/* --- Animações --- */
+.fade-in {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.slide-in {
+  animation: slideIn 0.3s cubic-bezier(0.22, 0.68, 0, 1.2) forwards;
+}
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* --- Tags --- */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 100px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.tag-purple {
+  background: rgba(124, 106, 255, 0.15);
+  color: var(--accent);
+  border: 1px solid rgba(124, 106, 255, 0.3);
+}
+.tag-green {
+  background: rgba(68, 255, 170, 0.12);
+  color: var(--accent3);
+  border: 1px solid rgba(68, 255, 170, 0.25);
+}
+.tag-red {
+  background: rgba(255, 68, 102, 0.12);
+  color: var(--danger);
+  border: 1px solid rgba(255, 68, 102, 0.25);
+}
+.tag-yellow {
+  background: rgba(255, 170, 68, 0.12);
+  color: var(--warning);
+  border: 1px solid rgba(255, 170, 68, 0.25);
+}
+.tag-pink {
+  background: rgba(255, 106, 155, 0.12);
+  color: var(--accent2);
+  border: 1px solid rgba(255, 106, 155, 0.25);
+}
+
+#modal-root {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 8000;
+}
+
+#toast-root {
+  position: fixed;
+  bottom: 0;
+  right: 0;
+  padding: 32px;
+  pointer-events: none;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-end;
+}
