@@ -1,0 +1,178 @@
+# =============================================================================
+# Java / Spring Boot
+# =============================================================================
+
+# Compilados e empacotados
+target/
+*.jar
+*.war
+*.ear
+*.class
+
+# Spring Boot DevTools
+.spring-boot-devtools.properties
+
+# Logs
+*.log
+logs/
+spring.log
+
+# =============================================================================
+# Maven
+# =============================================================================
+
+.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.properties
+
+# =============================================================================
+# IDEs
+# =============================================================================
+
+# IntelliJ IDEA
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+
+# Eclipse
+.classpath
+.project
+.settings/
+.factorypath
+bin/
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# NetBeans
+nbproject/private/
+nbbuild/
+nbdist/
+.nb-gradle/
+
+# =============================================================================
+# Frontend — Node / npm / Vite / React / TypeScript
+# =============================================================================
+
+# Dependências
+frontend/node_modules/
+node_modules/
+
+# Build
+frontend/dist/
+frontend/build/
+dist/
+build/
+
+# Cache Vite
+frontend/.vite/
+.vite/
+
+# TypeScript
+*.tsbuildinfo
+frontend/*.tsbuildinfo
+
+# ESLint cache
+.eslintcache
+frontend/.eslintcache
+
+# Variáveis de ambiente
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+frontend/.env
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+
+# =============================================================================
+# Docker
+# =============================================================================
+
+# Volumes locais mapeados
+docker/volumes/
+.docker/
+
+# Override de ambiente local
+docker-compose.override.yml
+docker-compose.local.yml
+
+# =============================================================================
+# Banco de dados local
+# =============================================================================
+
+*.sql.bak
+*.db
+*.sqlite
+*.sqlite3
+data/
+
+# =============================================================================
+# Sistema operacional
+# =============================================================================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+
+# =============================================================================
+# Segurança 
+# =============================================================================
+
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+*.truststore
+secrets/
+.secrets
+
+# =============================================================================
+# Testes e cobertura
+# =============================================================================
+
+coverage/
+*.exec
+jacoco.exec
+surefire-reports/
+failsafe-reports/
+frontend/coverage/
+
+# =============================================================================
+# Misc
+# =============================================================================
+
+*.tmp
+*.bak
+*.swp
+*.orig
+.cache/
