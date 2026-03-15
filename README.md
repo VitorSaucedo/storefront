@@ -86,7 +86,7 @@ Todos os serviços se comunicam exclusivamente através do API Gateway. A autent
 | Spring AMQP | 4.x | Mensageria RabbitMQ |
 | PostgreSQL | 16 | Banco de dados por serviço |
 | RabbitMQ | 3 | Message broker |
-| JWT (jjwt) | 0.12.x | Tokens de autenticação |
+| JWT (jjwt) | 0.13.x | Tokens de autenticação |
 | Docker / Docker Compose | — | Containerização |
 
 ### Frontend
