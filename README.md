@@ -13,6 +13,7 @@ Plataforma de e-commerce construída com arquitetura de microsserviços, comunic
 - [Fluxo de Negócio](#fluxo-de-negocio)
 - [Eventos RabbitMQ](#eventos-rabbitmq)
 - [API Reference](#api-reference)
+- [Testes](#testes)
 - [Configuração e Execução](#configuracao-e-execucao)
 - [Variáveis de Ambiente](#variaveis-de-ambiente)
 - [Estrutura do Projeto](#estrutura-do-projeto)
@@ -375,6 +376,100 @@ Todas as filas são duráveis (`durable=true`). A serialização de mensagens é
 | `GET` | `/payments/user` 🔒 | Pagamentos do usuário autenticado |
 | `GET` | `/payments/user/{userId}` 🔒👑 | Pagamentos de um usuário específico |
 | `GET` | `/payments/order/{orderId}` 🔒 | Pagamento de um pedido específico |
+
+---
+
+## Testes
+
+A suíte de testes cobre todos os serviços com testes unitários. Nenhum teste requer infraestrutura externa (banco de dados, RabbitMQ, etc.) — tudo é mockado ou simulado em memória.
+
+### Executando os testes
+
+```bash
+# Todos os testes de um serviço
+cd auth-service && mvn test
+
+# Classe específica
+mvn test -Dtest=AuthServiceTest
+
+# Todos os serviços de uma vez (da raiz do projeto, se houver parent pom)
+mvn test --projects auth-service,catalog-service,order-service,payment-service,notification-service,api-gateway
+```
+
+---
+
+### Cobertura por serviço
+
+#### API Gateway
+
+| Classe | Tipo | Cenários cobertos |
+|---|---|---|
+| `JwtUtilTest` | Unitário | `extractClaims` (token válido, expirado, assinatura inválida, malformado); `isValid` (true/false para cada caso); `extractUsername`; `extractRole` (com e sem claim) |
+| `JwtAuthenticationFilterTest` | Unitário | Paths públicos passam sem token; 401 para header ausente e formato incorreto; 401 para token inválido e expirado; propagação correta de `X-Auth-Username` e `X-Auth-Role`; `getOrder() == -1` |
+
+#### Auth Service
+
+| Classe | Tipo | Cenários cobertos |
+|---|---|---|
+| `JwtServiceTest` | Unitário | Geração de token com claims corretos; extração de username e role; validação (válido, expirado, assinatura inválida) |
+| `AuthServiceTest` | Unitário | Registro com sucesso e publicação de evento; e-mail duplicado lança exceção; login correto retorna token; senha incorreta lança exceção; busca de usuário existente e inexistente |
+| `AuthControllerTest` | `@WebMvcTest` | `POST /auth/register` — 200, 400 body inválido, 409 e-mail duplicado; `POST /auth/login` — 200, 401 credenciais inválidas; `GET /auth/users` — 200 para ADMIN, 403 para USER, 401 sem auth |
+
+#### Catalog Service
+
+| Classe | Tipo | Cenários cobertos |
+|---|---|---|
+| `ProductServiceTest` | Unitário | `findAll`, `findAvailable`, `findByCategory` (paginados); `findById` — encontrado e `ProductNotFoundException`; `create` — sucesso e publicação de evento; `update` — sucesso, produto não encontrado; `delete` — sucesso, produto não encontrado; `decrementStock` — sucesso, estoque insuficiente, produto não encontrado |
+| `ProductControllerTest` | `@WebMvcTest` | `GET /products` — 200 com página, vazia, 401; `GET /products/available` — 200, vazia; `GET /products/category/{category}` — 200, vazia, 401; `GET /products/{id}` — 200, 404, 401; `POST /products` — 201 (ADMIN), 400 inválido, 403 (USER), 401; `PUT /products/{id}` — 200, 404, 403, 401; `DELETE /products/{id}` — 204, 404, 403, 401 |
+
+#### Order Service
+
+| Classe | Tipo | Cenários cobertos |
+|---|---|---|
+| `OrderServiceTest` | Unitário | `findByUserId` — paginado, vazio; `findById` — encontrado, `OrderNotFoundException`; `findAll` — paginado; `create` — sucesso + evento + cálculo de total, produto não encontrado, estoque insuficiente, sem evento quando save falha; `confirmOrder` — sucesso + evento, não encontrado, status inválido (CONFIRMED, CANCELLED); `cancelOrder` — sucesso + evento com reason, não encontrado, status inválido |
+| `OrderControllerTest` | `@WebMvcTest` | `GET /orders` — 200 com página, vazia, 401; `GET /orders/{id}` — 200, 404, 401; `POST /orders` — 201, 400 body vazio, 400 items vazio, 400 sem productId, 400 quantity zero, 401; `PATCH /orders/{id}/cancel` — 200, 404, 401; `GET /orders/all` — 200 (ADMIN), 403 (USER), 401 |
+
+> **Nota:** o `GlobalExceptionHandler` do order-service foi corrigido para tratar `AccessDeniedException` e `AuthorizationDeniedException` com status 403 em vez de 500. O mesmo ajuste foi aplicado ao payment-service.
+
+#### Payment Service
+
+| Classe | Tipo | Cenários cobertos |
+|---|---|---|
+| `PaymentServiceTest` | Unitário | `processPayment` — criação do pagamento, publicação de exatamente um evento por chamada, idempotência (pedido duplicado ignorado), dados corretos no `PaymentProcessedEvent`, dados corretos no `PaymentFailedEvent`; `getPaymentsByUser` — paginado, vazio; `getPaymentByOrder` — encontrado (PROCESSED), encontrado (FAILED com reason), `PaymentNotFoundException` |
+| `PaymentControllerTest` | `@WebMvcTest` | `GET /payments/user` — 200 com página, vazia, 401; `GET /payments/user/{userId}` — 200 (ADMIN), 403 (USER), 401; `GET /payments/order/{orderId}` — 200 PROCESSED, 200 FAILED com failureReason, 404, 401 |
+
+#### Notification Service
+
+| Classe | Tipo | Cenários cobertos |
+|---|---|---|
+| `NotificationServiceTest` | Unitário | `notifyOrderConfirmed` — log INFO com orderId, userId e totalAmount; `notifyOrderCancelled` — log INFO com orderId, userId e reason; `notifyPaymentFailed` — log INFO com orderId, userId e reason; exatamente um log por chamada em cada método |
+| `NotificationListenerTest` | Unitário | `onOrderConfirmed` delega ao service com o evento correto; `onOrderCancelled` delega ao service com o evento correto; `onPaymentFailed` delega ao service com o evento correto; nenhuma interação adicional com o service |
+| `JwtUtilTest` | Unitário | `extractClaims`, `extractUsername`, `isTokenValid` — token válido, expirado, assinatura inválida |
+| `JwtAuthFilterTest` | Unitário | Sem header passa adiante; header inválido retorna 401; token inválido retorna 401; token válido popula `SecurityContext` com username e authorities |
+
+---
+
+### Padrões e decisões de teste
+
+**`@WebMvcTest` + `TestSecurityConfig`**
+Cada serviço com controller possui uma `TestSecurityConfig` em `src/test/java/.../config/` que substitui o `JwtAuthFilter` de produção por um filtro no-op. Isso evita a necessidade de configurar segredos JWT nos testes e permite usar `@WithMockUser` para simular autenticação.
+
+**Serialização de paginação**
+O formato do JSON paginado varia conforme a presença de `@EnableSpringDataWebSupport(pageSerializationMode = VIA_DTO)` na aplicação:
+- **Com** essa anotação (catalog-service): `$.page.totalElements`
+- **Sem** essa anotação (order-service, payment-service): `$.totalElements` na raiz
+
+**`BigDecimal` e escala**
+O Jackson serializa `BigDecimal` preservando a escala original. `new BigDecimal("299.90")` é serializado como `"299.90"`, não `"299.9"`. Os testes usam strings com a escala exata para evitar falsos negativos.
+
+**`processPayment` não determinístico**
+O `PaymentService` usa `Random` internamente (80% sucesso). Os testes de dados de evento usam loop de 100 tentativas para garantir que cada caminho (sucesso e falha) seja exercido ao menos uma vez — a probabilidade de 100 execuções consecutivas do mesmo tipo é desprezível.
+
+**`NotificationService` via `ListAppender`**
+Como o serviço não tem dependências externas (apenas escreve logs), os testes capturam os eventos de log usando `ListAppender<ILoggingEvent>` do Logback, sem necessidade de mocks.
+
+**Gateway reativo (`WebFlux`)**
+O api-gateway usa Spring Cloud Gateway (reativo). Os testes do filtro usam `MockServerHttpRequest` + `MockServerWebExchange` + `StepVerifier` do Reactor em vez de `MockMvc`. A captura do exchange mutado pelo filtro usa `ServerWebExchange` (interface) em vez da classe concreta de mock, pois `exchange.mutate().build()` retorna um `MutativeDecorator`, não o objeto original.
 
 ---
 
