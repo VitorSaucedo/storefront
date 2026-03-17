@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import {
   getProducts,
@@ -58,7 +58,7 @@ export default function ProductsPage() {
   const [modal, setModal] = useState<null | "create" | ProductResponse>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
 
-  const load = () => {
+  const load = useCallback(() => {
     if (!token) return;
     setLoading(true);
     getProducts(token)
@@ -71,9 +71,11 @@ export default function ProductsPage() {
         });
       })
       .finally(() => setLoading(false));
-  };
+  }, [token]);
 
-  useEffect(load, [token]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const set = (key: keyof FormState, value: string) =>
     setForm((f) => ({ ...f, [key]: value }));
@@ -154,10 +156,7 @@ export default function ProductsPage() {
   const isEditing = modal !== null && modal !== "create";
 
   return (
-    <div
-      className="fade-in"
-      style={{ padding: "32px", maxWidth: "1200px", margin: "0 auto" }}
-    >
+    <div className="fade-in page-container">
       <div
         style={{
           display: "flex",
@@ -266,6 +265,8 @@ export default function ProductsPage() {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
+                  flexWrap: "wrap",
+                  gap: "8px",
                   marginBottom: "16px",
                 }}
               >

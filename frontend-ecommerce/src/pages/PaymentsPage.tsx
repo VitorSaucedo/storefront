@@ -21,7 +21,7 @@ interface ToastState {
 }
 
 export default function PaymentsPage() {
-  const { token, isAdmin, user } = useAuth();
+  const { token, isAdmin } = useAuth();
 
   const [payments, setPayments] = useState<PaymentResponse[]>([]);
   const [users, setUsers] = useState<UserResponse[]>([]);
@@ -92,7 +92,7 @@ export default function PaymentsPage() {
   return (
     <div
       className="page-container"
-      style={{ padding: "32px", maxWidth: "1200px", margin: "0 auto" }}
+      
     >
       <div style={{ marginBottom: "32px" }}>
         <h1

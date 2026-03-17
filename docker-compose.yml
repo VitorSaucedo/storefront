@@ -4,6 +4,24 @@ networks:
 
 services:
   # ==========================================
+  # FRONTEND
+  # ==========================================
+  frontend:
+    build: ./frontend-ecommerce
+    ports:
+      - "3000:80"
+    depends_on:
+      - api-gateway
+    networks:
+      - microservices-net
+    deploy:
+      resources:
+        limits:
+          memory: 64m
+        reservations:
+          memory: 32m
+
+  # ==========================================
   # API GATEWAY
   # ==========================================
   api-gateway:

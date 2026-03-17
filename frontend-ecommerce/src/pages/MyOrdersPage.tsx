@@ -6,7 +6,7 @@ import {
   cancelOrder,
   getProducts,
 } from "../services/api";
-import type { OrderResponse, ProductResponse } from "../services/api";
+import type { OrderResponse } from "../services/api";
 import Card from "../components/Card";
 import Btn from "../components/Btn";
 import Spinner from "../components/Spinner";
@@ -112,7 +112,7 @@ export default function MyOrdersPage() {
   return (
     <div
       className="fade-in page-container"
-      style={{ padding: "32px", maxWidth: "1200px", margin: "0 auto" }}
+      
     >
       <div style={{ marginBottom: "28px" }}>
         <h2

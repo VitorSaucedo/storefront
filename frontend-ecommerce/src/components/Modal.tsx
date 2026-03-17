@@ -18,18 +18,31 @@ export default function Modal({
   width = 480,
 }: ModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
 
-  // 1. Controle de Scroll e Teclado (ESC)
+  // Mantém onCloseRef sempre atualizado sem re-executar o efeito
   useEffect(() => {
+    onCloseRef.current = onClose;
+  });
+
+  useEffect(() => {
+    if (!open) return;
+
+    document.body.style.overflow = "hidden";
+
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") onCloseRef.current();
     };
+    window.addEventListener("keydown", handleKeyDown);
 
-    if (open) {
-      document.body.style.overflow = "hidden";
-      window.addEventListener("keydown", handleKeyDown);
+    // Foca o modal apenas se nenhum input/textarea já estiver focado
+    const active = document.activeElement;
+    const isInputFocused =
+      active instanceof HTMLInputElement ||
+      active instanceof HTMLTextAreaElement ||
+      active instanceof HTMLSelectElement;
 
-      // Foco automático para acessibilidade ao abrir
+    if (!isInputFocused) {
       modalRef.current?.focus();
     }
 
@@ -37,25 +50,25 @@ export default function Modal({
       document.body.style.overflow = "";
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [open, onClose]);
+  }, [open]); // <-- apenas `open`, sem `onClose`
 
   if (!open) return null;
 
   return createPortal(
     <div
-      role="presentation" // Indica que o overlay é decorativo para cliques
+      role="presentation"
       onClick={onClose}
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(0,0,0,0.8)", // Um pouco mais escuro para melhor contraste
+        background: "rgba(0,0,0,0.8)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         zIndex: 9000,
         backdropFilter: "blur(8px)",
         WebkitBackdropFilter: "blur(8px)",
-        padding: "16px", // Padding menor para aproveitar tela no mobile
+        padding: "16px",
         pointerEvents: "all",
       }}
     >
@@ -63,29 +76,28 @@ export default function Modal({
         ref={modalRef}
         className="slide-in"
         onClick={(e) => e.stopPropagation()}
-        tabIndex={-1} // Permite que o div receba foco programático
-        role="dialog" // ARIA: Identifica como um diálogo
-        aria-modal="true" // ARIA: Indica que o conteúdo atrás é inerte
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
         aria-labelledby="modal-title"
         style={{
           background: "var(--surface)",
           border: "1px solid var(--border)",
           borderRadius: "var(--r, 16px)",
-          padding: "clamp(16px, 5vw, 28px)", // Padding responsivo
+          padding: "clamp(16px, 5vw, 28px)",
           width: "100%",
           maxWidth: width,
-          maxHeight: "90vh", // Aumentado para 90% para caber mais conteúdo no mobile
+          maxHeight: "90vh",
           overflowY: "auto",
           position: "relative",
           boxShadow: "0 24px 80px rgba(0,0,0,0.6)",
           outline: "none",
         }}
       >
-        {/* Header */}
         <div
           style={{
             display: "flex",
-            alignItems: "flex-start", // Melhor para títulos longos
+            alignItems: "flex-start",
             justifyContent: "space-between",
             marginBottom: "24px",
             gap: "12px",
@@ -95,7 +107,7 @@ export default function Modal({
             id="modal-title"
             style={{
               fontFamily: "Syne, sans-serif",
-              fontSize: "clamp(16px, 4vw, 20px)", // Fonte responsiva
+              fontSize: "clamp(16px, 4vw, 20px)",
               fontWeight: 700,
               color: "var(--text)",
             }}
@@ -112,7 +124,7 @@ export default function Modal({
               fontSize: "20px",
               lineHeight: 1,
               cursor: "pointer",
-              padding: "8px 12px", // Área de clique maior para touch
+              padding: "8px 12px",
               borderRadius: "8px",
               transition: "all 0.15s",
               flexShrink: 0,
@@ -122,7 +134,6 @@ export default function Modal({
           </button>
         </div>
 
-        {/* Content */}
         <div style={{ color: "var(--text)" }}>{children}</div>
       </div>
     </div>,

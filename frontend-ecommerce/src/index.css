@@ -25,7 +25,7 @@
   --success: #44ffaa;
   --r: 12px;
   --r-sm: 8px;
-  --sidebar-width: 240px; /* Aumentei um pouco a largura da sidebar para equilíbrio */
+  --sidebar-width: 240px;
 }
 
 body {
@@ -46,7 +46,6 @@ h4 {
   line-height: 1.2;
 }
 
-/* --- Layout Principal (AQUI ESTÁ A MUDANÇA) --- */
 .app-layout {
   display: flex;
   min-height: 100vh;
@@ -59,21 +58,18 @@ h4 {
   transition: margin-left 0.3s ease;
   width: 100%;
 
-  /* AJUSTE: Removemos o align-items: center e usamos flex-start */
-  padding: 48px 64px; /* Mais espaço nas laterais e topo */
+  padding: 48px 64px;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
 }
 
-/* Container agora "ancorado" à esquerda mas com limite de expansão */
 .main-container {
   width: 100%;
-  max-width: 1400px; /* Mais amplitude para o grid */
-  margin: 0; /* Remove o margin: 0 auto */
+  max-width: 1400px;
+  margin: 0;
 }
 
-/* --- StorePage & Outras Telas --- */
 .store-header {
   display: flex;
   justify-content: space-between;
@@ -97,12 +93,12 @@ h4 {
 }
 
 .search-input {
-  max-width: 320px; /* Busca um pouco maior */
+  max-width: 320px;
 }
 
 /* --- Typography Helpers --- */
 .syne-title {
-  font-size: 32px; /* Títulos um pouco mais imponentes */
+  font-size: 32px;
   font-weight: 800;
   letter-spacing: -0.5px;
 }
@@ -112,7 +108,6 @@ h4 {
   font-size: 14px;
 }
 
-/* --- Grid de Produtos (Mais colunas no Desktop) --- */
 .product-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
@@ -224,7 +219,7 @@ input:focus {
   .main-content {
     margin-left: 0;
     padding: 24px 16px !important;
-    align-items: stretch; /* Volta a centralizar/esticar no mobile */
+    align-items: stretch;
   }
 
   .store-header {
@@ -259,7 +254,7 @@ input:focus {
   }
 
   .product-grid {
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
     gap: 24px;
   }
 
@@ -329,8 +324,7 @@ input:focus {
 
 .page-container {
   padding: 32px;
-  max-width: 1200px;
-  margin: 0 auto;
+  width: 100%;
 }
 
 @media (min-width: 1366px) {
@@ -476,4 +470,25 @@ input:focus {
   flex-direction: column;
   gap: 10px;
   align-items: flex-end;
+}
+
+/* --- Imagem do card de produto --- */
+.product-card-image {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  overflow: hidden;
+  background: var(--surface2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.product-card-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
 }

@@ -1,4 +1,4 @@
-const API_BASE = "";
+const API_BASE = "/api";
 
 type UnauthorizedHandler = () => void;
 let unauthorizedHandler: UnauthorizedHandler | null = null;

@@ -65,10 +65,7 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div
-      className="fade-in"
-      style={{ padding: "32px", maxWidth: "1200px", margin: "0 auto" }}
-    >
+    <div className="fade-in page-container">
       <div style={{ marginBottom: "32px" }}>
         <h2
           style={{ fontSize: "26px", fontWeight: 800, letterSpacing: "-0.5px" }}
@@ -89,9 +86,10 @@ export default function DashboardPage() {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+              gridTemplateColumns: "repeat(4, 1fr)",
               gap: "16px",
               marginBottom: "32px",
+              width: "100%",
             }}
           >
             {stats.map((s) => (
@@ -100,6 +98,7 @@ export default function DashboardPage() {
                 style={{
                   background:
                     "linear-gradient(135deg, var(--surface) 0%, var(--surface2) 100%)",
+                  minWidth: 0,
                 }}
               >
                 <div
@@ -107,9 +106,10 @@ export default function DashboardPage() {
                     display: "flex",
                     alignItems: "flex-start",
                     justifyContent: "space-between",
+                    gap: "8px",
                   }}
                 >
-                  <div>
+                  <div style={{ minWidth: 0, flex: 1 }}>
                     <p
                       style={{
                         fontSize: "11px",
@@ -117,24 +117,32 @@ export default function DashboardPage() {
                         marginBottom: "8px",
                         textTransform: "uppercase",
                         letterSpacing: "0.08em",
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
                       }}
                     >
                       {s.label}
                     </p>
                     <p
                       style={{
-                        fontSize: "36px",
+                        fontSize: "clamp(16px, 1.6vw, 30px)",
                         fontFamily: "Syne, sans-serif",
                         fontWeight: 800,
                         color: s.color,
-                        lineHeight: 1,
+                        lineHeight: 1.2,
                       }}
                     >
                       {s.value}
                     </p>
                   </div>
                   <span
-                    style={{ fontSize: "28px", color: s.color, opacity: 0.3 }}
+                    style={{
+                      fontSize: "24px",
+                      color: s.color,
+                      opacity: 0.3,
+                      flexShrink: 0,
+                    }}
                   >
                     {s.icon}
                   </span>
@@ -143,7 +151,7 @@ export default function DashboardPage() {
             ))}
           </div>
 
-          <Card>
+          <Card style={{ width: "100%" }}>
             <h3
               style={{
                 fontFamily: "Syne, sans-serif",
