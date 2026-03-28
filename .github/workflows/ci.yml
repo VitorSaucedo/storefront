@@ -240,21 +240,21 @@ jobs:
 
       - name: Instalar dependências
         run: npm install
-        working-directory: frontend
+        working-directory: frontend-ecommerce
 
       - name: Type-check (tsc)
         run: npx tsc --noEmit
-        working-directory: frontend
+        working-directory: frontend-ecommerce
 
       - name: Build de produção
         run: npm run build
-        working-directory: frontend
+        working-directory: frontend-ecommerce
 
       - name: Publicar artefato do build
         uses: actions/upload-artifact@v4
         with:
           name: frontend-dist
-          path: frontend/dist/
+          path: frontend-ecommerce/dist/
           retention-days: 7
 
   # ──────────────────────────────────────────────────────────────────────
