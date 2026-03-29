@@ -22,7 +22,7 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
 
     private static final Logger log = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
 
-    @Value("${app.security.public-paths:/auth/register,/auth/login,/actuator/**}")
+    @Value("#{'${app.security.public-paths:/auth/register,/auth/login,/actuator/**}'.split(',')}")
     private List<String> publicPaths;
 
     private final JwtUtil jwtUtil;
