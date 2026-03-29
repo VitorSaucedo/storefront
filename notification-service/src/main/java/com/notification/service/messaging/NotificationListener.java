@@ -1,6 +1,6 @@
 package com.notification.service.messaging;
 
-import com.notification.service.config.RabbitMQConfig;
+import com.notification.service.config.MessagingConstants;
 import com.notification.service.dto.events.OrderCancelledEvent;
 import com.notification.service.dto.events.OrderConfirmedEvent;
 import com.notification.service.dto.events.PaymentFailedEvent;
@@ -17,17 +17,17 @@ public class NotificationListener {
         this.notificationService = notificationService;
     }
 
-    @RabbitListener(queues = RabbitMQConfig.ORDER_CONFIRMED_QUEUE)
+    @RabbitListener(queues = MessagingConstants.ORDER_CONFIRMED_QUEUE)
     public void onOrderConfirmed(OrderConfirmedEvent event) {
         notificationService.notifyOrderConfirmed(event);
     }
 
-    @RabbitListener(queues = RabbitMQConfig.ORDER_CANCELLED_QUEUE)
+    @RabbitListener(queues = MessagingConstants.ORDER_CANCELLED_QUEUE)
     public void onOrderCancelled(OrderCancelledEvent event) {
         notificationService.notifyOrderCancelled(event);
     }
 
-    @RabbitListener(queues = RabbitMQConfig.PAYMENT_FAILED_QUEUE)
+    @RabbitListener(queues = MessagingConstants.PAYMENT_FAILED_QUEUE)
     public void onPaymentFailed(PaymentFailedEvent event) {
         notificationService.notifyPaymentFailed(event);
     }

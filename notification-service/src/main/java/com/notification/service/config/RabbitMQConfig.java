@@ -1,9 +1,6 @@
 package com.notification.service.config;
 
-import org.springframework.amqp.core.Binding;
-import org.springframework.amqp.core.BindingBuilder;
-import org.springframework.amqp.core.Queue;
-import org.springframework.amqp.core.TopicExchange;
+import org.springframework.amqp.core.*;
 import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.converter.JacksonJsonMessageConverter;
@@ -14,40 +11,29 @@ import tools.jackson.databind.json.JsonMapper;
 @Configuration
 public class RabbitMQConfig {
 
-    public static final String ORDER_CONFIRMED_QUEUE    = "notification.order.confirmed";
-    public static final String ORDER_CANCELLED_QUEUE    = "notification.order.cancelled";
-    public static final String PAYMENT_FAILED_QUEUE     = "notification.payment.failed";
-
-    public static final String ORDER_EXCHANGE   = "order.exchange";
-    public static final String PAYMENT_EXCHANGE = "payment.exchange";
-
-    public static final String ORDER_CONFIRMED_KEY  = "order.confirmed";
-    public static final String ORDER_CANCELLED_KEY  = "order.cancelled";
-    public static final String PAYMENT_FAILED_KEY   = "payment.failed";
-
     @Bean
     public Queue orderConfirmedNotificationQueue() {
-        return new Queue(ORDER_CONFIRMED_QUEUE, true);
+        return new Queue(MessagingConstants.ORDER_CONFIRMED_QUEUE, true);
     }
 
     @Bean
     public Queue orderCancelledNotificationQueue() {
-        return new Queue(ORDER_CANCELLED_QUEUE, true);
+        return new Queue(MessagingConstants.ORDER_CANCELLED_QUEUE, true);
     }
 
     @Bean
     public Queue paymentFailedNotificationQueue() {
-        return new Queue(PAYMENT_FAILED_QUEUE, true);
+        return new Queue(MessagingConstants.PAYMENT_FAILED_QUEUE, true);
     }
 
     @Bean
     public TopicExchange orderExchange() {
-        return new TopicExchange(ORDER_EXCHANGE);
+        return new TopicExchange(MessagingConstants.ORDER_EXCHANGE);
     }
 
     @Bean
     public TopicExchange paymentExchange() {
-        return new TopicExchange(PAYMENT_EXCHANGE);
+        return new TopicExchange(MessagingConstants.PAYMENT_EXCHANGE);
     }
 
     @Bean
@@ -55,7 +41,7 @@ public class RabbitMQConfig {
         return BindingBuilder
                 .bind(orderConfirmedNotificationQueue())
                 .to(orderExchange())
-                .with(ORDER_CONFIRMED_KEY);
+                .with(MessagingConstants.ORDER_CONFIRMED_KEY);
     }
 
     @Bean
@@ -63,7 +49,7 @@ public class RabbitMQConfig {
         return BindingBuilder
                 .bind(orderCancelledNotificationQueue())
                 .to(orderExchange())
-                .with(ORDER_CANCELLED_KEY);
+                .with(MessagingConstants.ORDER_CANCELLED_KEY);
     }
 
     @Bean
@@ -71,12 +57,12 @@ public class RabbitMQConfig {
         return BindingBuilder
                 .bind(paymentFailedNotificationQueue())
                 .to(paymentExchange())
-                .with(PAYMENT_FAILED_KEY);
+                .with(MessagingConstants.PAYMENT_FAILED_KEY);
     }
 
     @Bean
     public JacksonJsonMessageConverter messageConverter() {
-        return new JacksonJsonMessageConverter(JsonMapper.builder().build());
+        return new JacksonJsonMessageConverter();
     }
 
     @Bean
@@ -93,5 +79,13 @@ public class RabbitMQConfig {
         factory.setConnectionFactory(connectionFactory);
         factory.setMessageConverter(messageConverter());
         return factory;
+    }
+
+    @Bean
+    public Queue orderConfirmedQueue() {
+        return QueueBuilder.durable(MessagingConstants.ORDER_CONFIRMED_QUEUE)
+                .withArgument("x-dead-letter-exchange", "notification.dlx")
+                .withArgument("x-dead-letter-routing-key", "notification.dlq")
+                .build();
     }
 }

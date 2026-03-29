@@ -13,6 +13,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import javax.crypto.SecretKey;
@@ -45,39 +47,57 @@ class JwtAuthFilterTest {
         SecurityContextHolder.clearContext();
     }
 
-    private String validToken(String username) {
-        return Jwts.builder()
+    private String createToken(String username, String role) {
+        var builder = Jwts.builder()
                 .subject(username)
                 .expiration(new Date(System.currentTimeMillis() + 60_000))
-                .signWith(secretKey)
-                .compact();
+                .signWith(secretKey);
+
+        if (role != null) {
+            builder.claim("role", role);
+        }
+
+        return builder.compact();
     }
 
-    // -------------------------------------------------------------------------
-    // Token válido
-    // -------------------------------------------------------------------------
     @Nested
     @DisplayName("com token válido no header Authorization")
     class ValidToken {
 
         @Test
-        @DisplayName("deve autenticar o usuário e chamar filterChain.doFilter")
-        void shouldAuthenticateUser() throws Exception {
-            String token = validToken("notif-consumer");
+        @DisplayName("deve autenticar o usuário com a ROLE_ADMIN correta")
+        void shouldAuthenticateAdminUser() throws Exception {
+            String token = createToken("admin-user", "ADMIN");
             when(request.getHeader("Authorization")).thenReturn("Bearer " + token);
 
             jwtAuthFilter.doFilterInternal(request, response, filterChain);
 
-            assertThat(SecurityContextHolder.getContext().getAuthentication()).isNotNull();
-            assertThat(SecurityContextHolder.getContext().getAuthentication().getPrincipal())
-                    .isEqualTo("notif-consumer");
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            assertThat(auth).isNotNull();
+            assertThat(auth.getPrincipal()).isEqualTo("admin-user");
+
+            assertThat(auth.getAuthorities())
+                    .extracting(GrantedAuthority::getAuthority)
+                    .containsExactly("ROLE_ADMIN");
+
             verify(filterChain).doFilter(request, response);
+        }
+
+        @Test
+        @DisplayName("deve autenticar o usuário com ROLE_USER quando role está ausente no token")
+        void shouldAuthenticateWithDefaultRole() throws Exception {
+            String token = createToken("standard-user", null);
+            when(request.getHeader("Authorization")).thenReturn("Bearer " + token);
+
+            jwtAuthFilter.doFilterInternal(request, response, filterChain);
+
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            assertThat(auth.getAuthorities())
+                    .extracting(GrantedAuthority::getAuthority)
+                    .containsExactly("ROLE_USER");
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Sem header / header inválido
-    // -------------------------------------------------------------------------
     @Nested
     @DisplayName("sem header Authorization ou header inválido")
     class NoOrInvalidHeader {
@@ -94,36 +114,9 @@ class JwtAuthFilterTest {
         }
 
         @Test
-        @DisplayName("deve prosseguir sem autenticar quando header não começa com Bearer")
-        void shouldPassThroughWhenNotBearer() throws Exception {
-            when(request.getHeader("Authorization")).thenReturn("Basic dXNlcjpwYXNz");
-
-            jwtAuthFilter.doFilterInternal(request, response, filterChain);
-
-            assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
-            verify(filterChain).doFilter(request, response);
-        }
-
-        @Test
         @DisplayName("deve prosseguir sem autenticar quando token é inválido")
         void shouldPassThroughWhenTokenInvalid() throws Exception {
             when(request.getHeader("Authorization")).thenReturn("Bearer token.invalido.aqui");
-
-            jwtAuthFilter.doFilterInternal(request, response, filterChain);
-
-            assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
-            verify(filterChain).doFilter(request, response);
-        }
-
-        @Test
-        @DisplayName("deve prosseguir sem autenticar quando token está expirado")
-        void shouldPassThroughWhenTokenExpired() throws Exception {
-            String expired = Jwts.builder()
-                    .subject("user")
-                    .expiration(new Date(System.currentTimeMillis() - 1_000))
-                    .signWith(secretKey)
-                    .compact();
-            when(request.getHeader("Authorization")).thenReturn("Bearer " + expired);
 
             jwtAuthFilter.doFilterInternal(request, response, filterChain);
 

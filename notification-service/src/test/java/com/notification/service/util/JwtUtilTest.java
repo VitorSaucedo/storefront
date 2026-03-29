@@ -28,12 +28,21 @@ class JwtUtilTest {
         secretKey = Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));
     }
 
-    private String buildToken(String subject, Date expiration) {
-        return Jwts.builder()
+    private String buildToken(String subject, String role, Date expiration) {
+        var builder = Jwts.builder()
                 .subject(subject)
                 .expiration(expiration)
-                .signWith(secretKey)
-                .compact();
+                .signWith(secretKey);
+
+        if (role != null) {
+            builder.claim("role", role);
+        }
+
+        return builder.compact();
+    }
+
+    private String buildToken(String subject, Date expiration) {
+        return buildToken(subject, null, expiration);
     }
 
     // -------------------------------------------------------------------------
@@ -50,6 +59,32 @@ class JwtUtilTest {
                     new Date(System.currentTimeMillis() + 60_000));
 
             assertThat(jwtUtil.extractUsername(token)).isEqualTo("notif-user@example.com");
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // extractRole
+    // -------------------------------------------------------------------------
+    @Nested
+    @DisplayName("extractRole")
+    class ExtractRole {
+
+        @Test
+        @DisplayName("deve extrair a role 'ADMIN' do token corretamente")
+        void shouldExtractAdminRole() {
+            String token = buildToken("admin@example.com", "ADMIN",
+                    new Date(System.currentTimeMillis() + 60_000));
+
+            assertThat(jwtUtil.extractRole(token)).isEqualTo("ADMIN");
+        }
+
+        @Test
+        @DisplayName("deve retornar null se a claim de role não estiver presente")
+        void shouldReturnNullWhenRoleIsMissing() {
+            String token = buildToken("user@example.com", null,
+                    new Date(System.currentTimeMillis() + 60_000));
+
+            assertThat(jwtUtil.extractRole(token)).isNull();
         }
     }
 
