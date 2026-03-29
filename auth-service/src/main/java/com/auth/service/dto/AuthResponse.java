@@ -1,21 +1,7 @@
 package com.auth.service.dto;
 
-public class AuthResponse {
+import lombok.Builder;
 
-    private String token;
-    private String email;
-    private String name;
-    private String role;
+@Builder
+public record AuthResponse(String token, String email, String name, String role){ }
 
-    public AuthResponse(String token, String email, String name, String role) {
-        this.token = token;
-        this.email = email;
-        this.name = name;
-        this.role = role;
-    }
-
-    public String getToken() { return token; }
-    public String getEmail() { return email; }
-    public String getName() { return name; }
-    public String getRole() { return role; }
-}

@@ -1,11 +1,13 @@
 package com.auth.service.messaging;
 
-import com.auth.service.config.RabbitMQConfig;
+import com.auth.service.config.MessagingConstants;
 import com.auth.service.dto.events.UserRegisteredEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 @Component
 public class AuthEventPublisher {
@@ -18,15 +20,16 @@ public class AuthEventPublisher {
         this.rabbitTemplate = rabbitTemplate;
     }
 
-    public void publishUserRegistered(UserRegisteredEvent event) {
-        log.info("Publicando evento user.registered para userId={}", event.getUserId());
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void handleUserRegisteredEvent(UserRegisteredEvent event) {
+        log.info("Publicando evento para RabbitMQ após commit: userId={}", event.userId());
 
         rabbitTemplate.convertAndSend(
-                RabbitMQConfig.AUTH_EXCHANGE,
-                RabbitMQConfig.USER_REGISTERED_ROUTING_KEY,
+                MessagingConstants.AUTH_EXCHANGE,
+                MessagingConstants.USER_REGISTERED_ROUTING_KEY,
                 event
         );
 
-        log.info("Evento user.registered publicado com sucesso para userId={}", event.getUserId());
+        log.info("Evento publicado com sucesso no exchange {}", MessagingConstants.AUTH_EXCHANGE);
     }
 }

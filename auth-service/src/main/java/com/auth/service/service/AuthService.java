@@ -8,15 +8,14 @@ import com.auth.service.dto.UserResponse;
 import com.auth.service.dto.events.UserRegisteredEvent;
 import com.auth.service.exception.EmailAlreadyExistsException;
 import com.auth.service.exception.InvalidCredentialsException;
-import com.auth.service.messaging.AuthEventPublisher;
 import com.auth.service.repository.UserRepository;
 import org.slf4j.Logger;import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.Pageable;
-
 
 @Service
 public class AuthService {
@@ -26,12 +25,12 @@ public class AuthService {
     private final UserRepository userRepository;
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
-    private final AuthEventPublisher eventPublisher;
+    private final ApplicationEventPublisher eventPublisher;
 
     public AuthService(UserRepository userRepository,
                        JwtService jwtService,
                        PasswordEncoder passwordEncoder,
-                       AuthEventPublisher eventPublisher) {
+                       ApplicationEventPublisher eventPublisher) {
         this.userRepository = userRepository;
         this.jwtService = jwtService;
         this.passwordEncoder = passwordEncoder;
@@ -40,38 +39,45 @@ public class AuthService {
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
-        if (userRepository.existsByEmail(request.getEmail())) {
-            log.warn("Tentativa de registro com e-mail já existente: {}", request.getEmail());
-            throw new EmailAlreadyExistsException(request.getEmail());
+        if (userRepository.existsByEmail(request.email())) {
+            log.warn("Tentativa de registro com e-mail já existente: {}", request.email());
+            throw new EmailAlreadyExistsException(request.email());
         }
 
         User user = new User();
-        user.setEmail(request.getEmail());
-        user.setName(request.getName());
-        user.setPassword(passwordEncoder.encode(request.getPassword()));
+        user.setEmail(request.email());
+        user.setName(request.name());
+        user.setPassword(passwordEncoder.encode(request.password()));
 
         User saved = userRepository.save(user);
 
-        eventPublisher.publishUserRegistered(new UserRegisteredEvent(
-                saved.getId(),
-                saved.getEmail(),
-                saved.getName()
-        ));
+        eventPublisher.publishEvent(UserRegisteredEvent.builder()
+                .userId(saved.getId())
+                .email(saved.getEmail())
+                .name(saved.getName())
+                .occurredAt(java.time.LocalDateTime.now())
+                .build());
 
         log.info("Novo usuário registrado: id={}, email={}", saved.getId(), saved.getEmail());
 
         String token = jwtService.generateToken(saved);
-        return new AuthResponse(token, saved.getEmail(), saved.getName(), saved.getRole().name());
+
+        return AuthResponse.builder()
+                .token(token)
+                .email(saved.getEmail())
+                .name(saved.getName())
+                .role(saved.getRole().name())
+                .build();
     }
 
     public AuthResponse login(LoginRequest request) {
-        User user = userRepository.findByEmail(request.getEmail())
+        User user = userRepository.findByEmail(request.email())
                 .orElseThrow(() -> {
-                    log.warn("Tentativa de login com e-mail não cadastrado: {}", request.getEmail());
+                    log.warn("Tentativa de login com e-mail não cadastrado: {}", request.email());
                     return new InvalidCredentialsException();
                 });
 
-        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+        if (!passwordEncoder.matches(request.password(), user.getPassword())) {
             log.warn("Senha incorreta para o usuário: id={}, email={}", user.getId(), user.getEmail());
             throw new InvalidCredentialsException();
         }
@@ -80,11 +86,22 @@ public class AuthService {
                 user.getId(), user.getEmail(), user.getRole());
 
         String token = jwtService.generateToken(user);
-        return new AuthResponse(token, user.getEmail(), user.getName(), user.getRole().name());
+
+        return AuthResponse.builder()
+                .token(token)
+                .email(user.getEmail())
+                .name(user.getName())
+                .role(user.getRole().name())
+                .build();
     }
 
     public Page<UserResponse> findAll(Pageable pageable) {
         return userRepository.findAll(pageable)
-                .map(u -> new UserResponse(u.getId(), u.getName(), u.getEmail(), u.getRole().name()));
+                .map(u -> UserResponse.builder()
+                        .id(u.getId())
+                        .name(u.getName())
+                        .email(u.getEmail())
+                        .role(u.getRole().name())
+                        .build());
     }
 }

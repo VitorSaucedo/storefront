@@ -52,7 +52,12 @@ class AuthControllerTest {
 
     @BeforeEach
     void setUp() {
-        authResponse = new AuthResponse("mocked-jwt-token", "user@example.com", "John Doe", "USER");
+        authResponse = AuthResponse.builder()
+                .token("mocked-jwt-token")
+                .email("user@example.com")
+                .name("John Doe")
+                .role("USER")
+                .build();
     }
 
     // -------------------------------------------------------------------------
@@ -65,10 +70,12 @@ class AuthControllerTest {
         @Test
         @DisplayName("deve retornar 201 Created com token ao registrar usuário válido")
         void shouldReturn201WhenRegisterIsSuccessful() throws Exception {
-            RegisterRequest request = new RegisterRequest();
-            request.setName("John Doe");
-            request.setEmail("user@example.com");
-            request.setPassword("password123");
+            RegisterRequest request = RegisterRequest.builder()
+                    .name("John Doe")
+                    .email("user@example.com")
+                    .password("password123")
+                    .build();
+
             when(authService.register(any(RegisterRequest.class))).thenReturn(authResponse);
 
             mockMvc.perform(post("/auth/register")
@@ -93,10 +100,11 @@ class AuthControllerTest {
         @Test
         @DisplayName("deve retornar 400 Bad Request quando email é inválido")
         void shouldReturn400WhenEmailIsInvalid() throws Exception {
-            RegisterRequest request = new RegisterRequest();
-            request.setName("John Doe");
-            request.setEmail("not-an-email");
-            request.setPassword("password123");
+            RegisterRequest request = RegisterRequest.builder()
+                    .name("John Doe")
+                    .email("not-an-email")
+                    .password("password123")
+                    .build();
 
             mockMvc.perform(post("/auth/register")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -107,10 +115,12 @@ class AuthControllerTest {
         @Test
         @DisplayName("deve retornar 409 Conflict quando e-mail já está cadastrado")
         void shouldReturn409WhenEmailAlreadyExists() throws Exception {
-            RegisterRequest request = new RegisterRequest();
-            request.setName("John Doe");
-            request.setEmail("user@example.com");
-            request.setPassword("password123");
+            RegisterRequest request = RegisterRequest.builder()
+                    .name("John Doe")
+                    .email("user@example.com")
+                    .password("password123")
+                    .build();
+
             when(authService.register(any(RegisterRequest.class)))
                     .thenThrow(new EmailAlreadyExistsException("user@example.com"));
 
@@ -131,9 +141,11 @@ class AuthControllerTest {
         @Test
         @DisplayName("deve retornar 200 OK com token ao realizar login com credenciais válidas")
         void shouldReturn200WhenLoginIsSuccessful() throws Exception {
-            LoginRequest request = new LoginRequest();
-            request.setEmail("user@example.com");
-            request.setPassword("password123");
+            LoginRequest request = LoginRequest.builder()
+                    .email("user@example.com")
+                    .password("password123")
+                    .build();
+
             when(authService.login(any(LoginRequest.class))).thenReturn(authResponse);
 
             mockMvc.perform(post("/auth/login")
@@ -156,9 +168,11 @@ class AuthControllerTest {
         @Test
         @DisplayName("deve retornar 401 Unauthorized quando as credenciais são inválidas")
         void shouldReturn401WhenCredentialsAreInvalid() throws Exception {
-            LoginRequest request = new LoginRequest();
-            request.setEmail("user@example.com");
-            request.setPassword("wrongpassword");
+            LoginRequest request = LoginRequest.builder()
+                    .email("user@example.com")
+                    .password("wrongpassword")
+                    .build();
+
             when(authService.login(any(LoginRequest.class)))
                     .thenThrow(new InvalidCredentialsException());
 
@@ -180,7 +194,13 @@ class AuthControllerTest {
         @WithMockUser(roles = "ADMIN")
         @DisplayName("deve retornar 200 OK com página de usuários quando autenticado como ADMIN")
         void shouldReturn200WithUserPageWhenAdminAuthenticated() throws Exception {
-            UserResponse userResponse = new UserResponse(1L, "John Doe", "user@example.com", "USER");
+            UserResponse userResponse = UserResponse.builder()
+                    .id(1L)
+                    .name("John Doe")
+                    .email("user@example.com")
+                    .role("USER")
+                    .build();
+
             Page<UserResponse> page = new PageImpl<>(List.of(userResponse), PageRequest.of(0, 20), 1);
             when(authService.findAll(any())).thenReturn(page);
 

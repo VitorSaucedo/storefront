@@ -9,7 +9,6 @@ import com.auth.service.dto.UserResponse;
 import com.auth.service.dto.events.UserRegisteredEvent;
 import com.auth.service.exception.EmailAlreadyExistsException;
 import com.auth.service.exception.InvalidCredentialsException;
-import com.auth.service.messaging.AuthEventPublisher;
 import com.auth.service.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -20,6 +19,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -47,7 +47,7 @@ class AuthServiceTest {
     private PasswordEncoder passwordEncoder;
 
     @Mock
-    private AuthEventPublisher eventPublisher;
+    private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private AuthService authService;
@@ -74,31 +74,35 @@ class AuthServiceTest {
         @Test
         @DisplayName("deve registrar usuário com sucesso e retornar AuthResponse com token")
         void shouldRegisterUserAndReturnAuthResponse() {
-            RegisterRequest request = new RegisterRequest();
-            request.setName("John Doe");
-            request.setEmail("user@example.com");
-            request.setPassword("password123");
-            when(userRepository.existsByEmail(request.getEmail())).thenReturn(false);
-            when(passwordEncoder.encode(request.getPassword())).thenReturn("hashed-password");
+            RegisterRequest request = RegisterRequest.builder()
+                    .name("John Doe")
+                    .email("user@example.com")
+                    .password("password123")
+                    .build();
+
+            when(userRepository.existsByEmail(request.email())).thenReturn(false); // Acesso via record: email()
+            when(passwordEncoder.encode(request.password())).thenReturn("hashed-password");
             when(userRepository.save(any(User.class))).thenReturn(mockUser);
             when(jwtService.generateToken(mockUser)).thenReturn("jwt-token");
 
             AuthResponse response = authService.register(request);
 
             assertThat(response).isNotNull();
-            assertThat(response.getToken()).isEqualTo("jwt-token");
-            assertThat(response.getEmail()).isEqualTo("user@example.com");
-            assertThat(response.getName()).isEqualTo("John Doe");
-            assertThat(response.getRole()).isEqualTo("USER");
+            assertThat(response.token()).isEqualTo("jwt-token");
+            assertThat(response.email()).isEqualTo("user@example.com");
+            assertThat(response.name()).isEqualTo("John Doe");
+            assertThat(response.role()).isEqualTo("USER");
         }
 
         @Test
         @DisplayName("deve salvar usuário com senha encodada (nunca em texto puro)")
         void shouldSaveUserWithEncodedPassword() {
-            RegisterRequest request = new RegisterRequest();
-            request.setName("John Doe");
-            request.setEmail("user@example.com");
-            request.setPassword("password123");
+            RegisterRequest request = RegisterRequest.builder()
+                    .name("John Doe")
+                    .email("user@example.com")
+                    .password("password123")
+                    .build();
+
             when(userRepository.existsByEmail(anyString())).thenReturn(false);
             when(passwordEncoder.encode("password123")).thenReturn("$2a$10$hashed");
             when(userRepository.save(any(User.class))).thenReturn(mockUser);
@@ -115,10 +119,12 @@ class AuthServiceTest {
         @Test
         @DisplayName("deve publicar evento UserRegisteredEvent após salvar o usuário")
         void shouldPublishUserRegisteredEventAfterSave() {
-            RegisterRequest request = new RegisterRequest();
-            request.setName("John Doe");
-            request.setEmail("user@example.com");
-            request.setPassword("password123");
+            RegisterRequest request = RegisterRequest.builder()
+                    .name("John Doe")
+                    .email("user@example.com")
+                    .password("password123")
+                    .build();
+
             when(userRepository.existsByEmail(anyString())).thenReturn(false);
             when(passwordEncoder.encode(anyString())).thenReturn("hashed-password");
             when(userRepository.save(any(User.class))).thenReturn(mockUser);
@@ -127,37 +133,42 @@ class AuthServiceTest {
             authService.register(request);
 
             ArgumentCaptor<UserRegisteredEvent> eventCaptor = ArgumentCaptor.forClass(UserRegisteredEvent.class);
-            verify(eventPublisher).publishUserRegistered(eventCaptor.capture());
+            verify(eventPublisher).publishEvent(eventCaptor.capture());
+
             UserRegisteredEvent event = eventCaptor.getValue();
-            assertThat(event.getUserId()).isEqualTo(1L);
-            assertThat(event.getEmail()).isEqualTo("user@example.com");
-            assertThat(event.getName()).isEqualTo("John Doe");
+            assertThat(event.userId()).isEqualTo(1L);
+            assertThat(event.email()).isEqualTo("user@example.com");
+            assertThat(event.name()).isEqualTo("John Doe");
         }
 
         @Test
         @DisplayName("deve lançar EmailAlreadyExistsException quando e-mail já está cadastrado")
         void shouldThrowEmailAlreadyExistsExceptionWhenEmailIsTaken() {
-            RegisterRequest request = new RegisterRequest();
-            request.setName("John Doe");
-            request.setEmail("user@example.com");
-            request.setPassword("password123");
-            when(userRepository.existsByEmail(request.getEmail())).thenReturn(true);
+            RegisterRequest request = RegisterRequest.builder()
+                    .name("John Doe")
+                    .email("user@example.com")
+                    .password("password123")
+                    .build();
+
+            when(userRepository.existsByEmail(request.email())).thenReturn(true);
 
             assertThatThrownBy(() -> authService.register(request))
                     .isInstanceOf(EmailAlreadyExistsException.class);
 
             verify(userRepository, never()).save(any());
-            verify(eventPublisher, never()).publishUserRegistered(any());
+            verify(eventPublisher, never()).publishEvent(any(UserRegisteredEvent.class));
             verify(jwtService, never()).generateToken(any());
         }
 
         @Test
         @DisplayName("não deve publicar evento se o save lançar exceção")
         void shouldNotPublishEventWhenSaveFails() {
-            RegisterRequest request = new RegisterRequest();
-            request.setName("John Doe");
-            request.setEmail("user@example.com");
-            request.setPassword("password123");
+            RegisterRequest request = RegisterRequest.builder()
+                    .name("John Doe")
+                    .email("user@example.com")
+                    .password("password123")
+                    .build();
+
             when(userRepository.existsByEmail(anyString())).thenReturn(false);
             when(passwordEncoder.encode(anyString())).thenReturn("hashed-password");
             when(userRepository.save(any(User.class))).thenThrow(new RuntimeException("DB error"));
@@ -165,7 +176,7 @@ class AuthServiceTest {
             assertThatThrownBy(() -> authService.register(request))
                     .isInstanceOf(RuntimeException.class);
 
-            verify(eventPublisher, never()).publishUserRegistered(any());
+            verify(eventPublisher, never()).publishEvent(any(UserRegisteredEvent.class));
         }
     }
 
@@ -179,28 +190,32 @@ class AuthServiceTest {
         @Test
         @DisplayName("deve retornar AuthResponse com token ao fazer login com credenciais corretas")
         void shouldReturnAuthResponseWhenCredentialsAreValid() {
-            LoginRequest request = new LoginRequest();
-            request.setEmail("user@example.com");
-            request.setPassword("password123");
-            when(userRepository.findByEmail(request.getEmail())).thenReturn(Optional.of(mockUser));
+            LoginRequest request = LoginRequest.builder()
+                    .email("user@example.com")
+                    .password("password123")
+                    .build();
+
+            when(userRepository.findByEmail(request.email())).thenReturn(Optional.of(mockUser));
             when(passwordEncoder.matches("password123", "hashed-password")).thenReturn(true);
             when(jwtService.generateToken(mockUser)).thenReturn("jwt-token");
 
             AuthResponse response = authService.login(request);
 
             assertThat(response).isNotNull();
-            assertThat(response.getToken()).isEqualTo("jwt-token");
-            assertThat(response.getEmail()).isEqualTo("user@example.com");
-            assertThat(response.getRole()).isEqualTo("USER");
+            assertThat(response.token()).isEqualTo("jwt-token");
+            assertThat(response.email()).isEqualTo("user@example.com");
+            assertThat(response.role()).isEqualTo("USER");
         }
 
         @Test
         @DisplayName("deve lançar InvalidCredentialsException quando e-mail não está cadastrado")
         void shouldThrowInvalidCredentialsWhenEmailNotFound() {
-            LoginRequest request = new LoginRequest();
-            request.setEmail("unknown@example.com");
-            request.setPassword("password123");
-            when(userRepository.findByEmail(request.getEmail())).thenReturn(Optional.empty());
+            LoginRequest request = LoginRequest.builder()
+                    .email("unknown@example.com")
+                    .password("password123")
+                    .build();
+
+            when(userRepository.findByEmail(request.email())).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> authService.login(request))
                     .isInstanceOf(InvalidCredentialsException.class);
@@ -212,10 +227,12 @@ class AuthServiceTest {
         @Test
         @DisplayName("deve lançar InvalidCredentialsException quando a senha está errada")
         void shouldThrowInvalidCredentialsWhenPasswordIsWrong() {
-            LoginRequest request = new LoginRequest();
-            request.setEmail("user@example.com");
-            request.setPassword("wrong-password");
-            when(userRepository.findByEmail(request.getEmail())).thenReturn(Optional.of(mockUser));
+            LoginRequest request = LoginRequest.builder()
+                    .email("user@example.com")
+                    .password("wrong-password")
+                    .build();
+
+            when(userRepository.findByEmail(request.email())).thenReturn(Optional.of(mockUser));
             when(passwordEncoder.matches("wrong-password", "hashed-password")).thenReturn(false);
 
             assertThatThrownBy(() -> authService.login(request))
@@ -227,13 +244,15 @@ class AuthServiceTest {
         @Test
         @DisplayName("não deve expor se o erro é no e-mail ou na senha (mesmo tipo de exceção)")
         void shouldThrowSameExceptionForEmailAndPasswordErrors() {
-            LoginRequest badEmail = new LoginRequest();
-            badEmail.setEmail("notfound@example.com");
-            badEmail.setPassword("anypass");
+            LoginRequest badEmail = LoginRequest.builder()
+                    .email("notfound@example.com")
+                    .password("anypass")
+                    .build();
 
-            LoginRequest badPassword = new LoginRequest();
-            badPassword.setEmail("user@example.com");
-            badPassword.setPassword("wrongpass");
+            LoginRequest badPassword = LoginRequest.builder()
+                    .email("user@example.com")
+                    .password("wrongpass")
+                    .build();
 
             when(userRepository.findByEmail("notfound@example.com")).thenReturn(Optional.empty());
             when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(mockUser));
@@ -265,10 +284,10 @@ class AuthServiceTest {
             assertThat(result).isNotNull();
             assertThat(result.getTotalElements()).isEqualTo(1);
             UserResponse dto = result.getContent().get(0);
-            assertThat(dto.getId()).isEqualTo(1L);
-            assertThat(dto.getName()).isEqualTo("John Doe");
-            assertThat(dto.getEmail()).isEqualTo("user@example.com");
-            assertThat(dto.getRole()).isEqualTo("USER");
+            assertThat(dto.id()).isEqualTo(1L);
+            assertThat(dto.name()).isEqualTo("John Doe");
+            assertThat(dto.email()).isEqualTo("user@example.com");
+            assertThat(dto.role()).isEqualTo("USER");
         }
 
         @Test
@@ -304,7 +323,7 @@ class AuthServiceTest {
 
             Page<UserResponse> result = authService.findAll(pageable);
 
-            assertThat(result.getContent().get(0).getRole()).isEqualTo("ADMIN");
+            assertThat(result.getContent().get(0).role()).isEqualTo("ADMIN");
         }
     }
 }

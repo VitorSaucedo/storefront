@@ -10,18 +10,14 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class RabbitMQConfig {
 
-    public static final String AUTH_EXCHANGE = "auth.exchange";
-    public static final String USER_REGISTERED_QUEUE = "user.registered.queue";
-    public static final String USER_REGISTERED_ROUTING_KEY = "user.registered";
-
     @Bean
     public TopicExchange authExchange() {
-        return new TopicExchange(AUTH_EXCHANGE);
+        return new TopicExchange(MessagingConstants.AUTH_EXCHANGE);
     }
 
     @Bean
     public Queue userRegisteredQueue() {
-        return QueueBuilder.durable(USER_REGISTERED_QUEUE).build();
+        return QueueBuilder.durable(MessagingConstants.USER_REGISTERED_QUEUE).build();
     }
 
     @Bean
@@ -29,7 +25,7 @@ public class RabbitMQConfig {
         return BindingBuilder
                 .bind(userRegisteredQueue)
                 .to(authExchange)
-                .with(USER_REGISTERED_ROUTING_KEY);
+                .with(MessagingConstants.USER_REGISTERED_ROUTING_KEY);
     }
 
     @Bean

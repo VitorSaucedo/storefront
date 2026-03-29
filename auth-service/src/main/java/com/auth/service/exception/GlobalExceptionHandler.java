@@ -1,5 +1,6 @@
 package com.auth.service.exception;
 
+import lombok.Builder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -22,14 +23,20 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleEmailAlreadyExists(EmailAlreadyExistsException ex) {
         log.warn("Tentativa de registro com email duplicado: {}", ex.getMessage());
         return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(new ErrorResponse(HttpStatus.CONFLICT.value(), ex.getMessage()));
+                .body(ErrorResponse.builder()
+                        .status(HttpStatus.CONFLICT.value())
+                        .message(ex.getMessage())
+                        .build());
     }
 
     @ExceptionHandler(InvalidCredentialsException.class)
     public ResponseEntity<ErrorResponse> handleInvalidCredentials(InvalidCredentialsException ex) {
         log.warn("Tentativa de login com credenciais inválidas");
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(new ErrorResponse(HttpStatus.UNAUTHORIZED.value(), ex.getMessage()));
+                .body(ErrorResponse.builder()
+                        .status(HttpStatus.UNAUTHORIZED.value())
+                        .message(ex.getMessage())
+                        .build());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -39,37 +46,43 @@ public class GlobalExceptionHandler {
             errors.put(fieldError.getField(), fieldError.getDefaultMessage());
         }
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(new ErrorResponse(HttpStatus.BAD_REQUEST.value(), "Erro de validação", errors));
+                .body(ErrorResponse.builder()
+                        .status(HttpStatus.BAD_REQUEST.value())
+                        .message("Erro de validação")
+                        .errors(errors)
+                        .build());
+    }
+
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAccessDenied(Exception ex) {
+        log.warn("Acesso negado: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ErrorResponse.builder()
+                        .status(HttpStatus.FORBIDDEN.value())
+                        .message("Acesso negado: você não tem permissão para este recurso")
+                        .build());
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGenericException(Exception ex) {
         log.error("Erro inesperado: {}", ex.getMessage(), ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(new ErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Erro interno no servidor"));
+                .body(ErrorResponse.builder()
+                        .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
+                        .message("Erro interno no servidor")
+                        .build());
     }
 
-    public static final class ErrorResponse {
-
-        private final int status;
-        private final String message;
-        private final Map<String, String> errors;
-        private final LocalDateTime timestamp;
-
-        public ErrorResponse(int status, String message) {
-            this(status, message, new HashMap<>());
+    @Builder
+    public record ErrorResponse(
+            int status,
+            String message,
+            Map<String, String> errors,
+            LocalDateTime timestamp
+    ){
+        public ErrorResponse {
+            if (timestamp == null) timestamp = LocalDateTime.now();
+            if (errors == null) errors = new HashMap<>();
         }
-
-        public ErrorResponse(int status, String message, Map<String, String> errors) {
-            this.status = status;
-            this.message = message;
-            this.errors = errors != null ? errors : new HashMap<>();
-            this.timestamp = LocalDateTime.now();
-        }
-
-        public int getStatus() { return status; }
-        public String getMessage() { return message; }
-        public Map<String, String> getErrors() { return errors; }
-        public LocalDateTime getTimestamp() { return timestamp; }
     }
 }
