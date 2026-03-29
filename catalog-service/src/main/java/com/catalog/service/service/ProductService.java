@@ -38,7 +38,6 @@ public class ProductService {
                 .map(this::toResponse);
     }
 
-
     public Page<ProductResponse> findAvailable(Pageable pageable) {
         return productRepository.findByStockQuantityGreaterThan(0, pageable)
                 .map(this::toResponse);
@@ -52,13 +51,14 @@ public class ProductService {
 
     @Transactional
     public ProductResponse create(ProductRequest request) {
-        Product product = new Product();
-        product.setImageUrl(request.getImageUrl());
-        product.setName(request.getName());
-        product.setDescription(request.getDescription());
-        product.setPrice(request.getPrice());
-        product.setStockQuantity(request.getStockQuantity());
-        product.setCategory(request.getCategory());
+        Product product = Product.builder()
+                .imageUrl(request.imageUrl())
+                .name(request.name())
+                .description(request.description())
+                .price(request.price())
+                .stockQuantity(request.stockQuantity())
+                .category(request.category())
+                .build();
 
         Product saved = productRepository.save(product);
         log.info("Produto criado: id={}, name={}", saved.getId(), saved.getName());
@@ -70,21 +70,21 @@ public class ProductService {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ProductNotFoundException(id));
 
-        product.setImageUrl(request.getImageUrl());
-        product.setName(request.getName());
-        product.setDescription(request.getDescription());
-        product.setPrice(request.getPrice());
-        product.setStockQuantity(request.getStockQuantity());
-        product.setCategory(request.getCategory());
+        product.setImageUrl(request.imageUrl());
+        product.setName(request.name());
+        product.setDescription(request.description());
+        product.setPrice(request.price());
+        product.setStockQuantity(request.stockQuantity());
+        product.setCategory(request.category());
 
         Product saved = productRepository.save(product);
 
-        eventPublisher.publishProductUpdated(new ProductUpdatedEvent(
-                saved.getId(),
-                saved.getName(),
-                saved.getPrice(),
-                saved.getStockQuantity()
-        ));
+        eventPublisher.publishProductUpdated(ProductUpdatedEvent.builder()
+                .productId(saved.getId())
+                .name(saved.getName())
+                .price(saved.getPrice())
+                .stockQuantity(saved.getStockQuantity())
+                .build());
 
         log.info("Produto atualizado: id={}", saved.getId());
         return toResponse(saved);
@@ -92,7 +92,7 @@ public class ProductService {
 
     @Transactional
     public void incrementStock(Long productId, Integer quantity) {
-        Product product = productRepository.findById(productId)
+        Product product = productRepository.findByIdForUpdate(productId)
                 .orElseThrow(() -> new ProductNotFoundException(productId));
 
         product.setStockQuantity(product.getStockQuantity() + quantity);
@@ -104,7 +104,7 @@ public class ProductService {
 
     @Transactional
     public void decrementStock(Long productId, Integer quantity) {
-        Product product = productRepository.findById(productId)
+        Product product = productRepository.findByIdForUpdate(productId)
                 .orElseThrow(() -> new ProductNotFoundException(productId));
 
         if (product.getStockQuantity() < quantity) {
@@ -128,16 +128,16 @@ public class ProductService {
     }
 
     private ProductResponse toResponse(Product product) {
-        return new ProductResponse(
-                product.getId(),
-                product.getName(),
-                product.getDescription(),
-                product.getPrice(),
-                product.getStockQuantity(),
-                product.getCategory(),
-                product.getImageUrl(),
-                product.getCreatedAt(),
-                product.getUpdatedAt()
-        );
+        return ProductResponse.builder()
+                .id(product.getId())
+                .name(product.getName())
+                .description(product.getDescription())
+                .price(product.getPrice())
+                .stockQuantity(product.getStockQuantity())
+                .category(product.getCategory())
+                .imageUrl(product.getImageUrl())
+                .createdAt(product.getCreatedAt())
+                .updatedAt(product.getUpdatedAt())
+                .build();
     }
 }

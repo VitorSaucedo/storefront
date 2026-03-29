@@ -1,5 +1,6 @@
 package com.catalog.service.exception;
 
+import lombok.Builder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -22,14 +23,20 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleProductNotFound(ProductNotFoundException ex) {
         log.warn("Produto não encontrado: {}", ex.getMessage());
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(new ErrorResponse(HttpStatus.NOT_FOUND.value(), ex.getMessage()));
+                .body(ErrorResponse.builder()
+                        .status(HttpStatus.NOT_FOUND.value())
+                        .message(ex.getMessage())
+                        .build());
     }
 
     @ExceptionHandler(InsufficientStockException.class)
     public ResponseEntity<ErrorResponse> handleInsufficientStock(InsufficientStockException ex) {
         log.warn("Estoque insuficiente: {}", ex.getMessage());
         return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(new ErrorResponse(HttpStatus.CONFLICT.value(), ex.getMessage()));
+                .body(ErrorResponse.builder()
+                        .status(HttpStatus.CONFLICT.value())
+                        .message(ex.getMessage())
+                        .build());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -39,37 +46,33 @@ public class GlobalExceptionHandler {
             errors.put(error.getField(), error.getDefaultMessage());
         }
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(new ErrorResponse(HttpStatus.BAD_REQUEST.value(), "Dados inválidos", errors));
+                .body(ErrorResponse.builder()
+                        .status(HttpStatus.BAD_REQUEST.value())
+                        .message("Dados inválidos")
+                        .errors(errors)
+                        .build());
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGeneric(Exception ex) {
         log.error("Erro inesperado: {}", ex.getMessage(), ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(new ErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Erro interno no servidor"));
+                .body(ErrorResponse.builder()
+                        .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
+                        .message("Erro interno no servidor")
+                        .build());
     }
 
-    public static final class ErrorResponse {
-
-        private final int status;
-        private final String message;
-        private final Map<String, String> errors;
-        private final LocalDateTime timestamp;
-
-        public ErrorResponse(int status, String message) {
-            this(status, message, new HashMap<>());
+    @Builder
+    public record ErrorResponse(
+            int status,
+            String message,
+            Map<String, String> errors,
+            LocalDateTime timestamp
+    ){
+        public ErrorResponse {
+            if (timestamp == null) timestamp = LocalDateTime.now();
+            if (errors == null) errors = new HashMap<>();
         }
-
-        public ErrorResponse(int status, String message, Map<String, String> errors) {
-            this.status = status;
-            this.message = message;
-            this.errors = errors != null ? errors : new HashMap<>();
-            this.timestamp = LocalDateTime.now();
-        }
-
-        public int getStatus() { return status; }
-        public String getMessage() { return message; }
-        public Map<String, String> getErrors() { return errors; }
-        public LocalDateTime getTimestamp() { return timestamp; }
     }
 }

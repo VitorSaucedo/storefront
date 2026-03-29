@@ -1,6 +1,6 @@
 package com.catalog.service.messaging;
 
-import com.catalog.service.config.RabbitMQConfig;
+import com.catalog.service.config.MessagingConstants;
 import com.catalog.service.dto.events.OrderCompensatedEvent;
 import com.catalog.service.dto.events.ProductUpdatedEvent;
 import org.slf4j.Logger;
@@ -22,8 +22,8 @@ public class CatalogEventPublisher {
     public void publishProductUpdated(ProductUpdatedEvent event) {
         log.info("Publicando produto.atualizado: productId={}", event.productId());
         rabbitTemplate.convertAndSend(
-                RabbitMQConfig.CATALOG_EXCHANGE,
-                RabbitMQConfig.PRODUCT_UPDATED_ROUTING_KEY,
+                MessagingConstants.CATALOG_EXCHANGE,
+                MessagingConstants.PRODUCT_UPDATED_ROUTING_KEY,
                 event
         );
         log.info("Evento produto.atualizado publicado com sucesso: productId={}", event.productId());
@@ -32,8 +32,8 @@ public class CatalogEventPublisher {
     public void publishOrderCompensated(OrderCompensatedEvent event) {
         log.warn("Publicando order.compensated: orderId={}", event.orderId());
         rabbitTemplate.convertAndSend(
-                RabbitMQConfig.CATALOG_EXCHANGE,
-                RabbitMQConfig.ORDER_COMPENSATED_ROUTING_KEY,
+                MessagingConstants.CATALOG_EXCHANGE,
+                MessagingConstants.ORDER_COMPENSATED_ROUTING_KEY,
                 event
         );
         log.warn("Evento order.compensated publicado: orderId={}", event.orderId());

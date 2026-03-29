@@ -1,6 +1,6 @@
 package com.catalog.service.messaging;
 
-import com.catalog.service.config.RabbitMQConfig;
+import com.catalog.service.config.MessagingConstants;
 import com.catalog.service.dto.events.OrderCompensatedEvent;
 import com.catalog.service.dto.events.OrderConfirmedEvent;
 import com.catalog.service.service.ProductService;
@@ -27,7 +27,7 @@ public class OrderEventConsumer {
         this.eventPublisher = eventPublisher;
     }
 
-    @RabbitListener(queues = RabbitMQConfig.ORDER_CONFIRMED_QUEUE)
+    @RabbitListener(queues = MessagingConstants.ORDER_CONFIRMED_QUEUE)
     public void onOrderConfirmed(OrderConfirmedEvent event) {
         log.info("Evento order.confirmed recebido: orderId={}", event.orderId());
 
@@ -66,7 +66,6 @@ public class OrderEventConsumer {
                 log.info("Compensação aplicada: productId={}, quantidade={}",
                         item.productId(), item.quantity());
             } catch (Exception ex) {
-                // Compensação falhou — requer intervenção manual
                 log.error("CRÍTICO — falha na compensação: productId={}, orderId={}, erro={}. " +
                                 "Intervenção manual necessária.",
                         item.productId(), orderId, ex.getMessage());

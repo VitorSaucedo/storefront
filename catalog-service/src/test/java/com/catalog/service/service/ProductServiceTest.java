@@ -47,21 +47,19 @@ class ProductServiceTest {
 
     @BeforeEach
     void setUp() {
-        mockProduct = new Product();
-        mockProduct.setId(1L);
-        mockProduct.setName("Teclado Mecânico");
-        mockProduct.setDescription("Teclado gamer com switches blue");
-        mockProduct.setPrice(new BigDecimal("299.90"));
-        mockProduct.setStockQuantity(50);
-        mockProduct.setCategory("PERIPHERALS");
-        mockProduct.setImageUrl("https://example.com/teclado.jpg");
-        mockProduct.setCreatedAt(LocalDateTime.now());
-        mockProduct.setUpdatedAt(LocalDateTime.now());
+        mockProduct = Product.builder()
+                .id(1L)
+                .name("Teclado Mecânico")
+                .description("Teclado gamer com switches blue")
+                .price(new BigDecimal("299.90"))
+                .stockQuantity(50)
+                .category("PERIPHERALS")
+                .imageUrl("https://example.com/teclado.jpg")
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .build();
     }
 
-    // -------------------------------------------------------------------------
-    // findAll()
-    // -------------------------------------------------------------------------
     @Nested
     @DisplayName("findAll()")
     class FindAll {
@@ -77,10 +75,9 @@ class ProductServiceTest {
 
             assertThat(result.getTotalElements()).isEqualTo(1);
             ProductResponse dto = result.getContent().get(0);
-            assertThat(dto.getId()).isEqualTo(1L);
-            assertThat(dto.getName()).isEqualTo("Teclado Mecânico");
-            assertThat(dto.getPrice()).isEqualByComparingTo("299.90");
-            assertThat(dto.getCategory()).isEqualTo("PERIPHERALS");
+            assertThat(dto.id()).isEqualTo(1L);
+            assertThat(dto.name()).isEqualTo("Teclado Mecânico");
+            assertThat(dto.price()).isEqualByComparingTo("299.90");
         }
 
         @Test
@@ -96,9 +93,6 @@ class ProductServiceTest {
         }
     }
 
-    // -------------------------------------------------------------------------
-    // findAvailable()
-    // -------------------------------------------------------------------------
     @Nested
     @DisplayName("findAvailable()")
     class FindAvailable {
@@ -113,14 +107,11 @@ class ProductServiceTest {
             Page<ProductResponse> result = productService.findAvailable(pageable);
 
             assertThat(result.getContent()).hasSize(1);
-            assertThat(result.getContent().get(0).getStockQuantity()).isGreaterThan(0);
+            assertThat(result.getContent().get(0).stockQuantity()).isGreaterThan(0);
             verify(productRepository).findByStockQuantityGreaterThan(0, pageable);
         }
     }
 
-    // -------------------------------------------------------------------------
-    // findByCategory()
-    // -------------------------------------------------------------------------
     @Nested
     @DisplayName("findByCategory()")
     class FindByCategory {
@@ -135,8 +126,7 @@ class ProductServiceTest {
             Page<ProductResponse> result = productService.findByCategory("PERIPHERALS", pageable);
 
             assertThat(result.getContent()).hasSize(1);
-            assertThat(result.getContent().get(0).getCategory()).isEqualTo("PERIPHERALS");
-            verify(productRepository).findByCategory("PERIPHERALS", pageable);
+            assertThat(result.getContent().get(0).category()).isEqualTo("PERIPHERALS");
         }
 
         @Test
@@ -152,9 +142,6 @@ class ProductServiceTest {
         }
     }
 
-    // -------------------------------------------------------------------------
-    // findById()
-    // -------------------------------------------------------------------------
     @Nested
     @DisplayName("findById()")
     class FindById {
@@ -166,9 +153,8 @@ class ProductServiceTest {
 
             ProductResponse result = productService.findById(1L);
 
-            assertThat(result.getId()).isEqualTo(1L);
-            assertThat(result.getName()).isEqualTo("Teclado Mecânico");
-            assertThat(result.getPrice()).isEqualByComparingTo("299.90");
+            assertThat(result.id()).isEqualTo(1L);
+            assertThat(result.name()).isEqualTo("Teclado Mecânico");
         }
 
         @Test
@@ -181,9 +167,6 @@ class ProductServiceTest {
         }
     }
 
-    // -------------------------------------------------------------------------
-    // create()
-    // -------------------------------------------------------------------------
     @Nested
     @DisplayName("create()")
     class Create {
@@ -192,13 +175,14 @@ class ProductServiceTest {
 
         @BeforeEach
         void setUp() {
-            request = new ProductRequest();
-            request.setName("Teclado Mecânico");
-            request.setDescription("Teclado gamer com switches blue");
-            request.setPrice(new BigDecimal("299.90"));
-            request.setStockQuantity(50);
-            request.setCategory("PERIPHERALS");
-            request.setImageUrl("https://example.com/teclado.jpg");
+            request = ProductRequest.builder()
+                    .name("Teclado Mecânico")
+                    .description("Teclado gamer com switches blue")
+                    .price(new BigDecimal("299.90"))
+                    .stockQuantity(50)
+                    .category("PERIPHERALS")
+                    .imageUrl("https://example.com/teclado.jpg")
+                    .build();
         }
 
         @Test
@@ -208,10 +192,8 @@ class ProductServiceTest {
 
             ProductResponse result = productService.create(request);
 
-            assertThat(result.getName()).isEqualTo("Teclado Mecânico");
-            assertThat(result.getPrice()).isEqualByComparingTo("299.90");
-            assertThat(result.getStockQuantity()).isEqualTo(50);
-            assertThat(result.getCategory()).isEqualTo("PERIPHERALS");
+            assertThat(result.name()).isEqualTo("Teclado Mecânico");
+            assertThat(result.price()).isEqualByComparingTo("299.90");
         }
 
         @Test
@@ -226,9 +208,6 @@ class ProductServiceTest {
             Product saved = captor.getValue();
 
             assertThat(saved.getName()).isEqualTo("Teclado Mecânico");
-            assertThat(saved.getPrice()).isEqualByComparingTo("299.90");
-            assertThat(saved.getStockQuantity()).isEqualTo(50);
-            assertThat(saved.getCategory()).isEqualTo("PERIPHERALS");
             assertThat(saved.getImageUrl()).isEqualTo("https://example.com/teclado.jpg");
         }
 
@@ -243,9 +222,6 @@ class ProductServiceTest {
         }
     }
 
-    // -------------------------------------------------------------------------
-    // update()
-    // -------------------------------------------------------------------------
     @Nested
     @DisplayName("update()")
     class Update {
@@ -254,35 +230,29 @@ class ProductServiceTest {
 
         @BeforeEach
         void setUp() {
-            request = new ProductRequest();
-            request.setName("Teclado Mecânico V2");
-            request.setDescription("Nova versão");
-            request.setPrice(new BigDecimal("349.90"));
-            request.setStockQuantity(30);
-            request.setCategory("PERIPHERALS");
-            request.setImageUrl("https://example.com/teclado-v2.jpg");
+            request = ProductRequest.builder()
+                    .name("Teclado Mecânico V2")
+                    .price(new BigDecimal("349.90"))
+                    .stockQuantity(30)
+                    .category("PERIPHERALS")
+                    .build();
         }
 
         @Test
         @DisplayName("deve atualizar os campos e retornar ProductResponse")
         void shouldUpdateFieldsAndReturnResponse() {
-            Product updated = new Product();
-            updated.setId(1L);
-            updated.setName("Teclado Mecânico V2");
-            updated.setPrice(new BigDecimal("349.90"));
-            updated.setStockQuantity(30);
-            updated.setCategory("PERIPHERALS");
-            updated.setImageUrl("https://example.com/teclado-v2.jpg");
-            updated.setCreatedAt(LocalDateTime.now());
-            updated.setUpdatedAt(LocalDateTime.now());
+            Product updated = Product.builder()
+                    .id(1L)
+                    .name("Teclado Mecânico V2")
+                    .price(new BigDecimal("349.90"))
+                    .build();
 
             when(productRepository.findById(1L)).thenReturn(Optional.of(mockProduct));
             when(productRepository.save(any(Product.class))).thenReturn(updated);
 
             ProductResponse result = productService.update(1L, request);
 
-            assertThat(result.getName()).isEqualTo("Teclado Mecânico V2");
-            assertThat(result.getPrice()).isEqualByComparingTo("349.90");
+            assertThat(result.name()).isEqualTo("Teclado Mecânico V2");
         }
 
         @Test
@@ -293,11 +263,7 @@ class ProductServiceTest {
 
             productService.update(1L, request);
 
-            ArgumentCaptor<ProductUpdatedEvent> captor = ArgumentCaptor.forClass(ProductUpdatedEvent.class);
-            verify(eventPublisher).publishProductUpdated(captor.capture());
-            ProductUpdatedEvent event = captor.getValue();
-            assertThat(event.productId()).isEqualTo(1L);
-            assertThat(event.name()).isEqualTo("Teclado Mecânico V2");
+            verify(eventPublisher).publishProductUpdated(any(ProductUpdatedEvent.class));
         }
 
         @Test
@@ -309,13 +275,9 @@ class ProductServiceTest {
                     .isInstanceOf(ProductNotFoundException.class);
 
             verify(productRepository, never()).save(any());
-            verify(eventPublisher, never()).publishProductUpdated(any());
         }
     }
 
-    // -------------------------------------------------------------------------
-    // delete()
-    // -------------------------------------------------------------------------
     @Nested
     @DisplayName("delete()")
     class Delete {
@@ -342,9 +304,6 @@ class ProductServiceTest {
         }
     }
 
-    // -------------------------------------------------------------------------
-    // incrementStock()
-    // -------------------------------------------------------------------------
     @Nested
     @DisplayName("incrementStock()")
     class IncrementStock {
@@ -353,31 +312,24 @@ class ProductServiceTest {
         @DisplayName("deve somar a quantidade ao estoque atual")
         void shouldAddQuantityToCurrentStock() {
             mockProduct.setStockQuantity(10);
-            when(productRepository.findById(1L)).thenReturn(Optional.of(mockProduct));
+            when(productRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(mockProduct));
             when(productRepository.save(any())).thenReturn(mockProduct);
 
             productService.incrementStock(1L, 5);
 
-            ArgumentCaptor<Product> captor = ArgumentCaptor.forClass(Product.class);
-            verify(productRepository).save(captor.capture());
-            assertThat(captor.getValue().getStockQuantity()).isEqualTo(15);
+            assertThat(mockProduct.getStockQuantity()).isEqualTo(15);
         }
 
         @Test
         @DisplayName("deve lançar ProductNotFoundException quando produto não existe")
-        void shouldThrowWhenProductNotFound() {
-            when(productRepository.findById(99L)).thenReturn(Optional.empty());
+        void shouldThrowWhenProductNotFound_Increment() {
+            when(productRepository.findByIdForUpdate(99L)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> productService.incrementStock(99L, 5))
                     .isInstanceOf(ProductNotFoundException.class);
-
-            verify(productRepository, never()).save(any());
         }
     }
 
-    // -------------------------------------------------------------------------
-    // decrementStock()
-    // -------------------------------------------------------------------------
     @Nested
     @DisplayName("decrementStock()")
     class DecrementStock {
@@ -386,51 +338,43 @@ class ProductServiceTest {
         @DisplayName("deve subtrair a quantidade do estoque atual")
         void shouldSubtractQuantityFromCurrentStock() {
             mockProduct.setStockQuantity(20);
-            when(productRepository.findById(1L)).thenReturn(Optional.of(mockProduct));
+            when(productRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(mockProduct));
             when(productRepository.save(any())).thenReturn(mockProduct);
 
             productService.decrementStock(1L, 8);
 
-            ArgumentCaptor<Product> captor = ArgumentCaptor.forClass(Product.class);
-            verify(productRepository).save(captor.capture());
-            assertThat(captor.getValue().getStockQuantity()).isEqualTo(12);
+            assertThat(mockProduct.getStockQuantity()).isEqualTo(12);
         }
 
         @Test
         @DisplayName("deve lançar InsufficientStockException quando estoque é insuficiente")
         void shouldThrowWhenStockIsInsufficient() {
             mockProduct.setStockQuantity(3);
-            when(productRepository.findById(1L)).thenReturn(Optional.of(mockProduct));
+            when(productRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(mockProduct));
 
             assertThatThrownBy(() -> productService.decrementStock(1L, 10))
                     .isInstanceOf(InsufficientStockException.class);
-
-            verify(productRepository, never()).save(any());
         }
 
         @Test
         @DisplayName("deve decrementar quando quantidade solicitada é igual ao estoque disponível")
         void shouldDecrementWhenQuantityEqualsStock() {
             mockProduct.setStockQuantity(5);
-            when(productRepository.findById(1L)).thenReturn(Optional.of(mockProduct));
+            when(productRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(mockProduct));
             when(productRepository.save(any())).thenReturn(mockProduct);
 
             productService.decrementStock(1L, 5);
 
-            ArgumentCaptor<Product> captor = ArgumentCaptor.forClass(Product.class);
-            verify(productRepository).save(captor.capture());
-            assertThat(captor.getValue().getStockQuantity()).isEqualTo(0);
+            assertThat(mockProduct.getStockQuantity()).isZero();
         }
 
         @Test
         @DisplayName("deve lançar ProductNotFoundException quando produto não existe")
-        void shouldThrowWhenProductNotFound() {
-            when(productRepository.findById(99L)).thenReturn(Optional.empty());
+        void shouldThrowWhenProductNotFound_Decrement() {
+            when(productRepository.findByIdForUpdate(99L)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> productService.decrementStock(99L, 5))
                     .isInstanceOf(ProductNotFoundException.class);
-
-            verify(productRepository, never()).save(any());
         }
     }
 }

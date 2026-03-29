@@ -11,58 +11,42 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class RabbitMQConfig {
 
-    public static final String CATALOG_EXCHANGE = "catalog.exchange";
-
-    public static final String PRODUCT_UPDATED_QUEUE      = "product.updated.queue";
-    public static final String PRODUCT_UPDATED_ROUTING_KEY = "product.updated";
-
-    public static final String ORDER_COMPENSATED_QUEUE       = "order.compensated.queue";
-    public static final String ORDER_COMPENSATED_ROUTING_KEY = "order.compensated";
-
-    public static final String ORDER_CONFIRMED_QUEUE       = "order.confirmed.queue";
-    public static final String ORDER_EXCHANGE              = "order.exchange";
-    public static final String ORDER_CONFIRMED_ROUTING_KEY = "order.confirmed";
-
-    public static final String ORDER_CONFIRMED_DLQ        = "order.confirmed.queue.dlq";
-    public static final String DEAD_LETTER_EXCHANGE       = "catalog.dlx";
-    public static final String ORDER_CONFIRMED_DLQ_ROUTING_KEY = "order.confirmed.dead";
-
     @Bean
     public TopicExchange catalogExchange() {
-        return new TopicExchange(CATALOG_EXCHANGE);
+        return new TopicExchange(MessagingConstants.CATALOG_EXCHANGE);
     }
 
     @Bean
     public TopicExchange orderExchange() {
-        return new TopicExchange(ORDER_EXCHANGE);
+        return new TopicExchange(MessagingConstants.ORDER_EXCHANGE);
     }
 
     @Bean
     public TopicExchange deadLetterExchange() {
-        return new TopicExchange(DEAD_LETTER_EXCHANGE);
+        return new TopicExchange(MessagingConstants.DEAD_LETTER_EXCHANGE);
     }
 
     @Bean
     public Queue productUpdatedQueue() {
-        return new Queue(PRODUCT_UPDATED_QUEUE, true);
+        return new Queue(MessagingConstants.PRODUCT_UPDATED_QUEUE, true);
     }
 
     @Bean
     public Queue orderConfirmedQueue() {
-        return QueueBuilder.durable(ORDER_CONFIRMED_QUEUE)
-                .withArgument("x-dead-letter-exchange", DEAD_LETTER_EXCHANGE)
-                .withArgument("x-dead-letter-routing-key", ORDER_CONFIRMED_DLQ_ROUTING_KEY)
+        return QueueBuilder.durable(MessagingConstants.ORDER_CONFIRMED_QUEUE)
+                .withArgument("x-dead-letter-exchange", MessagingConstants.DEAD_LETTER_EXCHANGE)
+                .withArgument("x-dead-letter-routing-key", MessagingConstants.ORDER_CONFIRMED_DLQ_ROUTING_KEY)
                 .build();
     }
 
     @Bean
     public Queue orderCompensatedQueue() {
-        return new Queue(ORDER_COMPENSATED_QUEUE, true);
+        return new Queue(MessagingConstants.ORDER_COMPENSATED_QUEUE, true);
     }
 
     @Bean
     public Queue orderConfirmedDlq() {
-        return QueueBuilder.durable(ORDER_CONFIRMED_DLQ).build();
+        return QueueBuilder.durable(MessagingConstants.ORDER_CONFIRMED_DLQ).build();
     }
 
     @Bean
@@ -70,7 +54,7 @@ public class RabbitMQConfig {
         return BindingBuilder
                 .bind(productUpdatedQueue())
                 .to(catalogExchange())
-                .with(PRODUCT_UPDATED_ROUTING_KEY);
+                .with(MessagingConstants.PRODUCT_UPDATED_ROUTING_KEY);
     }
 
     @Bean
@@ -78,7 +62,7 @@ public class RabbitMQConfig {
         return BindingBuilder
                 .bind(orderConfirmedQueue())
                 .to(orderExchange())
-                .with(ORDER_CONFIRMED_ROUTING_KEY);
+                .with(MessagingConstants.ORDER_CONFIRMED_ROUTING_KEY);
     }
 
     @Bean
@@ -86,7 +70,7 @@ public class RabbitMQConfig {
         return BindingBuilder
                 .bind(orderCompensatedQueue())
                 .to(catalogExchange())
-                .with(ORDER_COMPENSATED_ROUTING_KEY);
+                .with(MessagingConstants.ORDER_COMPENSATED_ROUTING_KEY);
     }
 
     @Bean
@@ -94,7 +78,7 @@ public class RabbitMQConfig {
         return BindingBuilder
                 .bind(orderConfirmedDlq())
                 .to(deadLetterExchange())
-                .with(ORDER_CONFIRMED_DLQ_ROUTING_KEY);
+                .with(MessagingConstants.ORDER_CONFIRMED_DLQ_ROUTING_KEY);
     }
 
     @Bean
