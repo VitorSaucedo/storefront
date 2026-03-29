@@ -1,10 +1,15 @@
 package com.api.gateway.config;
 
 import com.api.gateway.util.JwtUtil;
-import io.jsonwebtoken.Claims;import org.slf4j.Logger;import org.slf4j.LoggerFactory;import org.springframework.cloud.gateway.filter.GatewayFilterChain;
+import io.jsonwebtoken.Claims;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
@@ -17,11 +22,8 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
 
     private static final Logger log = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
 
-    private static final List<String> PUBLIC_PATHS = List.of(
-            "/auth/register",
-            "/auth/login",
-            "/actuator"
-    );
+    @Value("${app.security.public-paths:/auth/register,/auth/login,/actuator/**}")
+    private List<String> publicPaths;
 
     private final JwtUtil jwtUtil;
 
@@ -57,6 +59,11 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
         String username = jwtUtil.extractUsername(claims);
         String role     = jwtUtil.extractRole(claims);
 
+        if (isAdminRoute(exchange) && !"ADMIN".equals(role)) {
+            log.warn("Acesso proibido — role insuficiente: user={}, role={}, path={}", username, role, path);
+            return forbidden(exchange);
+        }
+
         log.debug("Requisição autenticada: user={}, role={}, path={}", username, role, path);
 
         ServerWebExchange mutatedExchange = exchange.mutate()
@@ -75,11 +82,31 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
     }
 
     private boolean isPublic(String path) {
-        return PUBLIC_PATHS.stream().anyMatch(path::startsWith);
+        return publicPaths.stream().anyMatch(path::startsWith);
+    }
+
+    private boolean isAdminRoute(ServerWebExchange exchange) {
+        String path = exchange.getRequest().getURI().getPath();
+        HttpMethod method = exchange.getRequest().getMethod();
+
+        if (path.startsWith("/orders/all") || path.startsWith("/auth/users")) {
+            return true;
+        }
+
+        if (path.startsWith("/products") && method != HttpMethod.GET) {
+            return true;
+        }
+
+        return false;
     }
 
     private Mono<Void> unauthorized(ServerWebExchange exchange) {
         exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+        return exchange.getResponse().setComplete();
+    }
+
+    private Mono<Void> forbidden(ServerWebExchange exchange) {
+        exchange.getResponse().setStatusCode(HttpStatus.FORBIDDEN);
         return exchange.getResponse().setComplete();
     }
 
