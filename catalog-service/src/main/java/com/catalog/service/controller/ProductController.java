@@ -13,6 +13,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.data.web.PagedModel;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/products")
 public class ProductController {
@@ -51,6 +53,11 @@ public class ProductController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ProductResponse> create(@Valid @RequestBody ProductRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(productService.create(request));
+    }
+
+    @PostMapping("/bulk-stock")
+    public ResponseEntity<List<ProductResponse>> getBulkStock(@RequestBody List<Long> ids) {
+        return ResponseEntity.ok(productService.findAllByIds(ids));
     }
 
     @PutMapping("/{id}")

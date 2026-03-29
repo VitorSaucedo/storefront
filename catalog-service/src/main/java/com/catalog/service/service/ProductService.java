@@ -15,6 +15,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.Pageable;
 
+import java.util.List;
+
 @Service
 public class ProductService {
 
@@ -47,6 +49,13 @@ public class ProductService {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ProductNotFoundException(id));
         return toResponse(product);
+    }
+
+    public List<ProductResponse> findAllByIds(List<Long> ids) {
+        log.info("Procurando stock em lote para {} IDs", ids.size());
+        return productRepository.findAllById(ids).stream()
+                .map(this::toResponse)
+                .toList();
     }
 
     @Transactional
