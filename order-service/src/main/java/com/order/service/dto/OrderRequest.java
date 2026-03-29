@@ -2,16 +2,15 @@ package com.order.service.dto;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
+import lombok.Builder;
+import lombok.Getter;
 
 import java.util.List;
 
-public class OrderRequest {
+@Builder
+public record OrderRequest(
 
     @NotEmpty(message = "O pedido deve ter pelo menos um item")
     @Valid
-    private List<OrderItemRequest> items;
-
-    // Getters e Setters
-    public List<OrderItemRequest> getItems() { return items; }
-    public void setItems(List<OrderItemRequest> items) { this.items = items; }
-}
+    List<OrderItemRequest> items
+){}

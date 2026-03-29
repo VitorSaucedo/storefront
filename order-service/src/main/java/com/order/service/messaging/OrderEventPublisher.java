@@ -1,6 +1,6 @@
 package com.order.service.messaging;
 
-import com.order.service.config.RabbitMQConfig;
+import com.order.service.config.MessagingConstants;
 import com.order.service.dto.events.OrderCancelledEvent;
 import com.order.service.dto.events.OrderConfirmedEvent;
 import com.order.service.dto.events.OrderCreatedEvent;
@@ -23,8 +23,8 @@ public class OrderEventPublisher {
     public void publishOrderCreated(OrderCreatedEvent event) {
         log.info("Publicando order.created: orderId={}", event.orderId());
         rabbitTemplate.convertAndSend(
-                RabbitMQConfig.ORDER_EXCHANGE,
-                RabbitMQConfig.ORDER_CREATED_ROUTING_KEY,
+                MessagingConstants.ORDER_EXCHANGE,
+                MessagingConstants.ORDER_CREATED_ROUTING_KEY,
                 event
         );
         log.info("Evento order.created publicado: orderId={}", event.orderId());
@@ -33,8 +33,8 @@ public class OrderEventPublisher {
     public void publishOrderConfirmed(OrderConfirmedEvent event) {
         log.info("Publicando order.confirmed: orderId={}", event.orderId());
         rabbitTemplate.convertAndSend(
-                RabbitMQConfig.ORDER_EXCHANGE,
-                RabbitMQConfig.ORDER_CONFIRMED_ROUTING_KEY,
+                MessagingConstants.ORDER_EXCHANGE,
+                MessagingConstants.ORDER_CONFIRMED_ROUTING_KEY,
                 event
         );
         log.info("Evento order.confirmed publicado: orderId={}", event.orderId());
@@ -43,8 +43,8 @@ public class OrderEventPublisher {
     public void publishOrderCancelled(OrderCancelledEvent event) {
         log.info("Publicando order.cancelled: orderId={}", event.orderId());
         rabbitTemplate.convertAndSend(
-                RabbitMQConfig.ORDER_EXCHANGE,
-                RabbitMQConfig.ORDER_CANCELLED_ROUTING_KEY,
+                MessagingConstants.ORDER_EXCHANGE,
+                MessagingConstants.ORDER_CANCELLED_ROUTING_KEY,
                 event
         );
         log.info("Evento order.cancelled publicado: orderId={}", event.orderId());

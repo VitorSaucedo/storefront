@@ -1,6 +1,6 @@
 package com.order.service.messaging;
 
-import com.order.service.config.RabbitMQConfig;
+import com.order.service.config.MessagingConstants;
 import com.order.service.dto.events.PaymentFailedEvent;
 import com.order.service.dto.events.PaymentProcessedEvent;
 import com.order.service.service.OrderService;
@@ -20,7 +20,7 @@ public class PaymentEventConsumer {
         this.orderService = orderService;
     }
 
-    @RabbitListener(queues = RabbitMQConfig.PAYMENT_PROCESSED_QUEUE)
+    @RabbitListener(queues = MessagingConstants.PAYMENT_PROCESSED_QUEUE)
     public void onPaymentProcessed(PaymentProcessedEvent event) {
         log.info("Evento payment.processed recebido: orderId={}", event.orderId());
         try {
@@ -30,7 +30,7 @@ public class PaymentEventConsumer {
         }
     }
 
-    @RabbitListener(queues = RabbitMQConfig.PAYMENT_FAILED_QUEUE)
+    @RabbitListener(queues = MessagingConstants.PAYMENT_FAILED_QUEUE)
     public void onPaymentFailed(PaymentFailedEvent event) {
         log.info("Evento payment.failed recebido: orderId={}, reason={}", event.orderId(), event.reason());
         try {

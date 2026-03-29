@@ -1,10 +1,11 @@
 package com.order.service.service;
 
 import com.order.service.client.CatalogClient;
+import com.order.service.config.MessagingConstants;
 import com.order.service.domain.Order;
 import com.order.service.domain.OrderItem;
 import com.order.service.domain.OrderStatus;
-import com.order.service.dto.OrderItemRequest;
+import com.order.service.dto.OrderItemResponse;
 import com.order.service.dto.OrderRequest;
 import com.order.service.dto.OrderResponse;
 import com.order.service.dto.events.OrderCancelledEvent;
@@ -22,6 +23,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -32,13 +34,15 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final OrderEventPublisher eventPublisher;
     private final CatalogClient catalogClient;
+    private final OutboxService outboxService;
 
     public OrderService(OrderRepository orderRepository,
                         OrderEventPublisher eventPublisher,
-                        CatalogClient catalogClient) {
+                        CatalogClient catalogClient, OutboxService outboxService) {
         this.orderRepository = orderRepository;
         this.eventPublisher = eventPublisher;
         this.catalogClient = catalogClient;
+        this.outboxService = outboxService;
     }
 
     public Page<OrderResponse> findByUserId(Long userId, Pageable pageable) {
@@ -57,52 +61,55 @@ public class OrderService {
 
     @Transactional
     public OrderResponse create(OrderRequest request, Long userId, String userEmail) {
+        catalogClient.reserveStock(request.items());
 
-        for (OrderItemRequest item : request.getItems()) {
-            CatalogClient.ProductStock stock = catalogClient.getProductStock(item.getProductId());
-            if (stock == null) {
-                throw new RuntimeException("Produto não encontrado: id=" + item.getProductId());
-            }
-            if (stock.stockQuantity() < item.getQuantity()) {
-                throw new RuntimeException(
-                        "Estoque insuficiente para o produto '" + stock.name() + "'. " +
-                                "Disponível: " + stock.stockQuantity() + ", Solicitado: " + item.getQuantity()
-                );
-            }
-        }
+        BigDecimal total = request.items().stream()
+                .map(i -> i.unitPrice().multiply(BigDecimal.valueOf(i.quantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        List<OrderItem> domainItems = request.items().stream()
+                .map(i -> new OrderItem(i.productId(), i.quantity(), i.unitPrice()))
+                .toList();
 
         Order order = new Order();
         order.setUserId(userId);
         order.setUserEmail(userEmail);
-
-        List<OrderItem> items = request.getItems().stream()
-                .map(i -> new OrderItem(i.getProductId(), i.getQuantity(), i.getUnitPrice()))
-                .toList();
-
-        BigDecimal total = request.getItems().stream()
-                .map(i -> i.getUnitPrice().multiply(BigDecimal.valueOf(i.getQuantity())))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        order.setItems(items);
+        order.setItems(domainItems);
         order.setTotalAmount(total);
 
         Order saved = orderRepository.save(order);
-        log.info("Pedido criado: id={}, userId={}", saved.getId(), userId);
+        log.info("Pedido criado e estoque reservado: id={}, userId={}", saved.getId(), userId);
 
-        List<OrderCreatedEvent.OrderItem> eventItems = items.stream()
-                .map(i -> new OrderCreatedEvent.OrderItem(i.getProductId(), i.getQuantity(), i.getUnitPrice()))
+        List<com.order.service.dto.OrderItem> eventItems = domainItems.stream()
+                .map(i -> com.order.service.dto.OrderItem.builder()
+                        .productId(i.getProductId())
+                        .quantity(i.getQuantity())
+                        .unitPrice(i.getUnitPrice())
+                        .build())
                 .toList();
 
-        eventPublisher.publishOrderCreated(new OrderCreatedEvent(
-                saved.getId(), userId, userEmail, eventItems, total
-        ));
+        OrderCreatedEvent event = OrderCreatedEvent.builder()
+                .orderId(saved.getId())
+                .userId(userId)
+                .userEmail(userEmail)
+                .items(eventItems)
+                .totalAmount(total)
+                .occurredAt(LocalDateTime.now())
+                .build();
+
+        outboxService.saveEvent(
+                event,
+                saved.getId().toString(),
+                "ORDER_CREATED",
+                MessagingConstants.ORDER_CREATED_ROUTING_KEY
+        );
 
         return toResponse(saved);
     }
 
     @Transactional
     public void confirmOrder(Long orderId) {
-        Order order = orderRepository.findById(orderId)
+        Order order = orderRepository.findByIdForUpdate(orderId)
                 .orElseThrow(() -> new OrderNotFoundException(orderId));
 
         if (order.getStatus() != OrderStatus.PENDING) {
@@ -113,18 +120,32 @@ public class OrderService {
         orderRepository.save(order);
         log.info("Pedido confirmado: id={}", orderId);
 
-        List<OrderConfirmedEvent.OrderItem> eventItems = order.getItems().stream()
-                .map(i -> new OrderConfirmedEvent.OrderItem(i.getProductId(), i.getQuantity()))
+        List<com.order.service.dto.OrderItem> eventItems = order.getItems().stream()
+                .map(i -> com.order.service.dto.OrderItem.builder()
+                        .productId(i.getProductId())
+                        .quantity(i.getQuantity())
+                        .build())
                 .toList();
 
-        eventPublisher.publishOrderConfirmed(new OrderConfirmedEvent(
-                order.getId(), order.getUserId(), order.getUserEmail(), eventItems
-        ));
+        OrderConfirmedEvent event = OrderConfirmedEvent.builder()
+                .orderId(order.getId())
+                .userId(order.getUserId())
+                .userEmail(order.getUserEmail())
+                .items(eventItems)
+                .occurredAt(LocalDateTime.now())
+                .build();
+
+        outboxService.saveEvent(
+                event,
+                order.getId().toString(),
+                "ORDER_CONFIRMED",
+                MessagingConstants.ORDER_CONFIRMED_ROUTING_KEY
+        );
     }
 
     @Transactional
     public void cancelOrder(Long orderId, String reason) {
-        Order order = orderRepository.findById(orderId)
+        Order order = orderRepository.findByIdForUpdate(orderId)
                 .orElseThrow(() -> new OrderNotFoundException(orderId));
 
         if (order.getStatus() != OrderStatus.PENDING) {
@@ -135,26 +156,48 @@ public class OrderService {
         orderRepository.save(order);
         log.info("Pedido cancelado: id={}, reason={}", orderId, reason);
 
-        eventPublisher.publishOrderCancelled(new OrderCancelledEvent(
-                order.getId(), order.getUserId(), order.getUserEmail(), reason
-        ));
+        List<com.order.service.dto.OrderItem> eventItems = order.getItems().stream()
+                .map(i -> com.order.service.dto.OrderItem.builder()
+                        .productId(i.getProductId())
+                        .quantity(i.getQuantity())
+                        .build())
+                .toList();
+
+        OrderCancelledEvent event = OrderCancelledEvent.builder()
+                .orderId(order.getId())
+                .userId(order.getUserId())
+                .userEmail(order.getUserEmail())
+                .reason(reason)
+                .items(eventItems)
+                .occurredAt(LocalDateTime.now())
+                .build();
+
+        outboxService.saveEvent(
+                event,
+                order.getId().toString(),
+                "ORDER_CANCELLED",
+                MessagingConstants.ORDER_CANCELLED_ROUTING_KEY
+        );
     }
 
     private OrderResponse toResponse(Order order) {
-        List<OrderResponse.OrderItemResponse> itemResponses = order.getItems().stream()
-                .map(i -> new OrderResponse.OrderItemResponse(
-                        i.getProductId(), i.getQuantity(), i.getUnitPrice()))
+        List<OrderItemResponse> itemResponses = order.getItems().stream()
+                .map(i -> OrderItemResponse.builder()
+                        .productId(i.getProductId())
+                        .quantity(i.getQuantity())
+                        .unitPrice(i.getUnitPrice())
+                        .build())
                 .toList();
 
-        return new OrderResponse(
-                order.getId(),
-                order.getUserId(),
-                order.getUserEmail(),
-                order.getStatus(),
-                order.getTotalAmount(),
-                itemResponses,
-                order.getCreatedAt(),
-                order.getUpdatedAt()
-        );
+        return OrderResponse.builder()
+                .id(order.getId())
+                .userId(order.getUserId())
+                .userEmail(order.getUserEmail())
+                .status(order.getStatus())
+                .totalAmount(order.getTotalAmount())
+                .items(itemResponses)
+                .createdAt(order.getCreatedAt())
+                .updatedAt(order.getUpdatedAt())
+                .build();
     }
 }

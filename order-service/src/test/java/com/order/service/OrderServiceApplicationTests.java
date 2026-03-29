@@ -1,6 +1,8 @@
 package com.order.service;
 
 import com.order.service.repository.OrderRepository;
+import com.order.service.repository.OutboxRepository;
+import com.order.service.service.OutboxService;
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -18,6 +20,12 @@ class OrderServiceApplicationTests {
 
 	@MockitoBean
 	private OrderRepository orderRepository;
+
+	@MockitoBean
+	private OutboxRepository outboxRepository;
+
+	@MockitoBean
+	private OutboxService outboxService;
 
 	@MockitoBean
 	private ConnectionFactory connectionFactory;

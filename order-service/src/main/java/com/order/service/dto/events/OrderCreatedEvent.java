@@ -1,9 +1,13 @@
 package com.order.service.dto.events;
 
+import com.order.service.dto.OrderItem;
+import lombok.Builder;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
+@Builder
 public record OrderCreatedEvent(
         Long orderId,
         Long userId,
@@ -16,10 +20,4 @@ public record OrderCreatedEvent(
                              List<OrderItem> items, BigDecimal totalAmount) {
         this(orderId, userId, userEmail, items, totalAmount, LocalDateTime.now());
     }
-
-    public record OrderItem(
-            Long productId,
-            Integer quantity,
-            BigDecimal unitPrice
-    ) {}
 }

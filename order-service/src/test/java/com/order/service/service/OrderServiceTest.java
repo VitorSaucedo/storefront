@@ -1,6 +1,7 @@
 package com.order.service.service;
 
 import com.order.service.client.CatalogClient;
+import com.order.service.config.MessagingConstants;
 import com.order.service.domain.Order;
 import com.order.service.domain.OrderItem;
 import com.order.service.domain.OrderStatus;
@@ -12,14 +13,13 @@ import com.order.service.dto.events.OrderConfirmedEvent;
 import com.order.service.dto.events.OrderCreatedEvent;
 import com.order.service.exception.InvalidOrderStatusException;
 import com.order.service.exception.OrderNotFoundException;
-import com.order.service.messaging.OrderEventPublisher;
 import com.order.service.repository.OrderRepository;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -44,7 +44,7 @@ class OrderServiceTest {
     private OrderRepository orderRepository;
 
     @Mock
-    private OrderEventPublisher eventPublisher;
+    private OutboxService outboxService;
 
     @Mock
     private CatalogClient catalogClient;
@@ -52,26 +52,45 @@ class OrderServiceTest {
     @InjectMocks
     private OrderService orderService;
 
-    private Order pendingOrder;
+    // -------------------------------------------------------------------------
+    // Fixtures
+    // -------------------------------------------------------------------------
 
-    @BeforeEach
-    void setUp() {
-        pendingOrder = new Order();
-        pendingOrder.setId(1L);
-        pendingOrder.setUserId(42L);
-        pendingOrder.setUserEmail("user@example.com");
-        pendingOrder.setStatus(OrderStatus.PENDING);
-        pendingOrder.setTotalAmount(new BigDecimal("299.90"));
-        pendingOrder.setCreatedAt(LocalDateTime.now());
-        pendingOrder.setUpdatedAt(LocalDateTime.now());
+    private static final Long   ORDER_ID   = 1L;
+    private static final Long   USER_ID    = 42L;
+    private static final String USER_EMAIL = "user@example.com";
 
-        OrderItem item = new OrderItem(10L, 2, new BigDecimal("149.95"));
-        pendingOrder.setItems(List.of(item));
+    private static final OrderItem ITEM = new OrderItem(10L, 2, new BigDecimal("149.95"));
+
+    private static Order pendingOrder() {
+        return Order.builder()
+                .id(ORDER_ID)
+                .userId(USER_ID)
+                .userEmail(USER_EMAIL)
+                .status(OrderStatus.PENDING)
+                .totalAmount(new BigDecimal("299.90"))
+                .items(List.of(ITEM))
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .build();
+    }
+
+    private static OrderRequest buildRequest() {
+        OrderItemRequest item = OrderItemRequest.builder()
+                .productId(10L)
+                .quantity(2)
+                .unitPrice(new BigDecimal("149.95"))
+                .build();
+
+        return OrderRequest.builder()
+                .items(List.of(item))
+                .build();
     }
 
     // -------------------------------------------------------------------------
     // findByUserId
     // -------------------------------------------------------------------------
+
     @Nested
     @DisplayName("findByUserId")
     class FindByUserId {
@@ -80,14 +99,15 @@ class OrderServiceTest {
         @DisplayName("deve retornar página de pedidos do usuário")
         void shouldReturnOrderPageForUser() {
             PageRequest pageable = PageRequest.of(0, 10);
-            Page<Order> orderPage = new PageImpl<>(List.of(pendingOrder), pageable, 1);
-            when(orderRepository.findByUserId(42L, pageable)).thenReturn(orderPage);
+            Order order = pendingOrder();
+            Page<Order> orderPage = new PageImpl<>(List.of(order), pageable, 1);
+            when(orderRepository.findByUserId(USER_ID, pageable)).thenReturn(orderPage);
 
-            Page<OrderResponse> result = orderService.findByUserId(42L, pageable);
+            Page<OrderResponse> result = orderService.findByUserId(USER_ID, pageable);
 
             assertThat(result.getTotalElements()).isEqualTo(1);
-            assertThat(result.getContent().get(0).getId()).isEqualTo(1L);
-            assertThat(result.getContent().get(0).getUserEmail()).isEqualTo("user@example.com");
+            assertThat(result.getContent().get(0).id()).isEqualTo(ORDER_ID);
+            assertThat(result.getContent().get(0).userEmail()).isEqualTo(USER_EMAIL);
         }
 
         @Test
@@ -105,6 +125,7 @@ class OrderServiceTest {
     // -------------------------------------------------------------------------
     // findById
     // -------------------------------------------------------------------------
+
     @Nested
     @DisplayName("findById")
     class FindById {
@@ -112,12 +133,13 @@ class OrderServiceTest {
         @Test
         @DisplayName("deve retornar o pedido quando encontrado")
         void shouldReturnOrderWhenFound() {
-            when(orderRepository.findById(1L)).thenReturn(Optional.of(pendingOrder));
+            Order order = pendingOrder();
+            when(orderRepository.findById(ORDER_ID)).thenReturn(Optional.of(order));
 
-            OrderResponse result = orderService.findById(1L);
+            OrderResponse result = orderService.findById(ORDER_ID);
 
-            assertThat(result.getId()).isEqualTo(1L);
-            assertThat(result.getStatus()).isEqualTo(OrderStatus.PENDING);
+            assertThat(result.id()).isEqualTo(ORDER_ID);
+            assertThat(result.status()).isEqualTo(OrderStatus.PENDING);
         }
 
         @Test
@@ -134,6 +156,7 @@ class OrderServiceTest {
     // -------------------------------------------------------------------------
     // findAll
     // -------------------------------------------------------------------------
+
     @Nested
     @DisplayName("findAll")
     class FindAll {
@@ -142,7 +165,7 @@ class OrderServiceTest {
         @DisplayName("deve retornar todos os pedidos paginados")
         void shouldReturnAllOrders() {
             PageRequest pageable = PageRequest.of(0, 10);
-            Page<Order> page = new PageImpl<>(List.of(pendingOrder), pageable, 1);
+            Page<Order> page = new PageImpl<>(List.of(pendingOrder()), pageable, 1);
             when(orderRepository.findAll(pageable)).thenReturn(page);
 
             Page<OrderResponse> result = orderService.findAll(pageable);
@@ -154,155 +177,178 @@ class OrderServiceTest {
     // -------------------------------------------------------------------------
     // create
     // -------------------------------------------------------------------------
+
     @Nested
     @DisplayName("create")
     class Create {
 
-        private OrderRequest buildRequest() {
-            OrderItemRequest item = new OrderItemRequest();
-            item.setProductId(10L);
-            item.setQuantity(2);
-            item.setUnitPrice(new BigDecimal("149.95"));
-
-            OrderRequest request = new OrderRequest();
-            request.setItems(List.of(item));
-            return request;
-        }
-
         @Test
-        @DisplayName("deve criar pedido e publicar OrderCreatedEvent")
-        void shouldCreateOrderAndPublishEvent() {
-            CatalogClient.ProductStock stock = new CatalogClient.ProductStock(10L, "Teclado", 50);
-            when(catalogClient.getProductStock(10L)).thenReturn(stock);
-            when(orderRepository.save(any())).thenReturn(pendingOrder);
+        @DisplayName("deve criar pedido e salvar evento no outbox")
+        void shouldCreateOrderAndSaveOutboxEvent() {
+            Order saved = pendingOrder();
+            when(orderRepository.save(any())).thenReturn(saved);
 
-            OrderResponse result = orderService.create(buildRequest(), 42L, "user@example.com");
+            OrderResponse result = orderService.create(buildRequest(), USER_ID, USER_EMAIL);
 
-            assertThat(result.getId()).isEqualTo(1L);
-            assertThat(result.getStatus()).isEqualTo(OrderStatus.PENDING);
+            assertThat(result.id()).isEqualTo(ORDER_ID);
+            assertThat(result.status()).isEqualTo(OrderStatus.PENDING);
 
             ArgumentCaptor<OrderCreatedEvent> captor = ArgumentCaptor.forClass(OrderCreatedEvent.class);
-            verify(eventPublisher).publishOrderCreated(captor.capture());
+            verify(outboxService).saveEvent(
+                    captor.capture(),
+                    eq(ORDER_ID.toString()),
+                    eq("ORDER_CREATED"),
+                    eq(MessagingConstants.ORDER_CREATED_ROUTING_KEY)
+            );
+
             OrderCreatedEvent event = captor.getValue();
-            assertThat(event.orderId()).isEqualTo(1L);
-            assertThat(event.userId()).isEqualTo(42L);
-            assertThat(event.userEmail()).isEqualTo("user@example.com");
+            assertThat(event.orderId()).isEqualTo(ORDER_ID);
+            assertThat(event.userId()).isEqualTo(USER_ID);
+            assertThat(event.userEmail()).isEqualTo(USER_EMAIL);
         }
 
         @Test
         @DisplayName("deve calcular o totalAmount corretamente")
         void shouldCalculateTotalAmount() {
-            CatalogClient.ProductStock stock = new CatalogClient.ProductStock(10L, "Teclado", 50);
-            when(catalogClient.getProductStock(10L)).thenReturn(stock);
-
-            Order saved = new Order();
-            saved.setId(2L);
-            saved.setUserId(42L);
-            saved.setUserEmail("user@example.com");
-            saved.setStatus(OrderStatus.PENDING);
-            saved.setTotalAmount(new BigDecimal("299.90")); // 149.95 * 2
-            saved.setItems(pendingOrder.getItems());
-            saved.setCreatedAt(LocalDateTime.now());
-            saved.setUpdatedAt(LocalDateTime.now());
+            // 149.95 * 2 = 299.90
+            Order saved = Order.builder()
+                    .id(2L)
+                    .userId(USER_ID)
+                    .userEmail(USER_EMAIL)
+                    .status(OrderStatus.PENDING)
+                    .totalAmount(new BigDecimal("299.90"))
+                    .items(List.of(ITEM))
+                    .createdAt(LocalDateTime.now())
+                    .updatedAt(LocalDateTime.now())
+                    .build();
             when(orderRepository.save(any())).thenReturn(saved);
 
-            OrderResponse result = orderService.create(buildRequest(), 42L, "user@example.com");
+            OrderResponse result = orderService.create(buildRequest(), USER_ID, USER_EMAIL);
 
-            assertThat(result.getTotalAmount()).isEqualByComparingTo(new BigDecimal("299.90"));
+            assertThat(result.totalAmount()).isEqualByComparingTo(new BigDecimal("299.90"));
         }
 
         @Test
-        @DisplayName("deve lançar RuntimeException quando produto não é encontrado no catálogo")
-        void shouldThrowWhenProductNotFound() {
-            when(catalogClient.getProductStock(10L)).thenReturn(null);
+        @DisplayName("deve reservar estoque antes de salvar o pedido")
+        void shouldReserveStockBeforeSaving() {
+            when(orderRepository.save(any())).thenReturn(pendingOrder());
 
-            assertThatThrownBy(() -> orderService.create(buildRequest(), 42L, "user@example.com"))
-                    .isInstanceOf(RuntimeException.class)
-                    .hasMessageContaining("Produto não encontrado");
+            OrderRequest request = buildRequest();
+            orderService.create(request, USER_ID, USER_EMAIL);
+
+            InOrder inOrder = inOrder(catalogClient, orderRepository);
+            inOrder.verify(catalogClient).reserveStock(request.items());
+            inOrder.verify(orderRepository).save(any());
         }
 
         @Test
-        @DisplayName("deve lançar RuntimeException quando estoque é insuficiente")
-        void shouldThrowWhenStockInsufficient() {
-            // stock de 1, mas pediu 2
-            CatalogClient.ProductStock stock = new CatalogClient.ProductStock(10L, "Teclado", 1);
-            when(catalogClient.getProductStock(10L)).thenReturn(stock);
+        @DisplayName("não deve salvar pedido nem evento quando reserva de estoque falha")
+        void shouldNotSaveOrderWhenStockReservationFails() {
+            doThrow(new RuntimeException("Estoque insuficiente"))
+                    .when(catalogClient).reserveStock(any());
 
-            assertThatThrownBy(() -> orderService.create(buildRequest(), 42L, "user@example.com"))
+            assertThatThrownBy(() -> orderService.create(buildRequest(), USER_ID, USER_EMAIL))
                     .isInstanceOf(RuntimeException.class)
                     .hasMessageContaining("Estoque insuficiente");
+
+            verify(orderRepository, never()).save(any());
+            verify(outboxService, never()).saveEvent(any(), any(), any(), any());
         }
 
         @Test
         @DisplayName("não deve publicar evento quando save falha")
         void shouldNotPublishEventWhenSaveFails() {
-            CatalogClient.ProductStock stock = new CatalogClient.ProductStock(10L, "Teclado", 50);
-            when(catalogClient.getProductStock(10L)).thenReturn(stock);
             when(orderRepository.save(any())).thenThrow(new RuntimeException("DB error"));
 
-            assertThatThrownBy(() -> orderService.create(buildRequest(), 42L, "user@example.com"))
+            assertThatThrownBy(() -> orderService.create(buildRequest(), USER_ID, USER_EMAIL))
                     .isInstanceOf(RuntimeException.class);
 
-            verify(eventPublisher, never()).publishOrderCreated(any());
+            verify(outboxService, never()).saveEvent(any(), any(), any(), any());
         }
     }
 
     // -------------------------------------------------------------------------
     // confirmOrder
     // -------------------------------------------------------------------------
+
     @Nested
     @DisplayName("confirmOrder")
     class ConfirmOrder {
 
         @Test
-        @DisplayName("deve confirmar pedido PENDING e publicar OrderConfirmedEvent")
-        void shouldConfirmOrderAndPublishEvent() {
-            when(orderRepository.findById(1L)).thenReturn(Optional.of(pendingOrder));
-            when(orderRepository.save(any())).thenReturn(pendingOrder);
+        @DisplayName("deve confirmar pedido PENDING e salvar evento no outbox")
+        void shouldConfirmOrderAndSaveOutboxEvent() {
+            Order order = pendingOrder();
+            when(orderRepository.findByIdForUpdate(ORDER_ID)).thenReturn(Optional.of(order));
+            when(orderRepository.save(any())).thenReturn(order);
 
-            orderService.confirmOrder(1L);
+            orderService.confirmOrder(ORDER_ID);
 
-            assertThat(pendingOrder.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
-            verify(orderRepository).save(pendingOrder);
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
+            verify(orderRepository).save(order);
 
             ArgumentCaptor<OrderConfirmedEvent> captor = ArgumentCaptor.forClass(OrderConfirmedEvent.class);
-            verify(eventPublisher).publishOrderConfirmed(captor.capture());
+            verify(outboxService).saveEvent(
+                    captor.capture(),
+                    eq(ORDER_ID.toString()),
+                    eq("ORDER_CONFIRMED"),
+                    eq(MessagingConstants.ORDER_CONFIRMED_ROUTING_KEY)
+            );
+
             OrderConfirmedEvent event = captor.getValue();
-            assertThat(event.orderId()).isEqualTo(1L);
-            assertThat(event.userId()).isEqualTo(42L);
+            assertThat(event.orderId()).isEqualTo(ORDER_ID);
+            assertThat(event.userId()).isEqualTo(USER_ID);
         }
 
         @Test
         @DisplayName("deve lançar OrderNotFoundException quando pedido não existe")
         void shouldThrowWhenOrderNotFound() {
-            when(orderRepository.findById(99L)).thenReturn(Optional.empty());
+            when(orderRepository.findByIdForUpdate(99L)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> orderService.confirmOrder(99L))
                     .isInstanceOf(OrderNotFoundException.class);
 
-            verify(eventPublisher, never()).publishOrderConfirmed(any());
+            verify(outboxService, never()).saveEvent(any(), any(), any(), any());
         }
 
         @Test
         @DisplayName("deve lançar InvalidOrderStatusException quando status não é PENDING")
         void shouldThrowWhenStatusIsNotPending() {
-            pendingOrder.setStatus(OrderStatus.CONFIRMED);
-            when(orderRepository.findById(1L)).thenReturn(Optional.of(pendingOrder));
+            Order confirmed = Order.builder()
+                    .id(ORDER_ID)
+                    .userId(USER_ID)
+                    .userEmail(USER_EMAIL)
+                    .status(OrderStatus.CONFIRMED)
+                    .totalAmount(new BigDecimal("299.90"))
+                    .items(List.of(ITEM))
+                    .createdAt(LocalDateTime.now())
+                    .updatedAt(LocalDateTime.now())
+                    .build();
+            when(orderRepository.findByIdForUpdate(ORDER_ID)).thenReturn(Optional.of(confirmed));
 
-            assertThatThrownBy(() -> orderService.confirmOrder(1L))
+            assertThatThrownBy(() -> orderService.confirmOrder(ORDER_ID))
                     .isInstanceOf(InvalidOrderStatusException.class)
                     .hasMessageContaining("confirmar");
 
-            verify(eventPublisher, never()).publishOrderConfirmed(any());
+            verify(outboxService, never()).saveEvent(any(), any(), any(), any());
         }
 
         @Test
         @DisplayName("não deve confirmar pedido CANCELLED")
         void shouldThrowWhenOrderIsCancelled() {
-            pendingOrder.setStatus(OrderStatus.CANCELLED);
-            when(orderRepository.findById(1L)).thenReturn(Optional.of(pendingOrder));
+            Order cancelled = Order.builder()
+                    .id(ORDER_ID)
+                    .userId(USER_ID)
+                    .userEmail(USER_EMAIL)
+                    .status(OrderStatus.CANCELLED)
+                    .totalAmount(new BigDecimal("299.90"))
+                    .items(List.of(ITEM))
+                    .createdAt(LocalDateTime.now())
+                    .updatedAt(LocalDateTime.now())
+                    .build();
+            when(orderRepository.findByIdForUpdate(ORDER_ID)).thenReturn(Optional.of(cancelled));
 
-            assertThatThrownBy(() -> orderService.confirmOrder(1L))
+            assertThatThrownBy(() -> orderService.confirmOrder(ORDER_ID))
                     .isInstanceOf(InvalidOrderStatusException.class);
         }
     }
@@ -310,60 +356,86 @@ class OrderServiceTest {
     // -------------------------------------------------------------------------
     // cancelOrder
     // -------------------------------------------------------------------------
+
     @Nested
     @DisplayName("cancelOrder")
     class CancelOrder {
 
         @Test
-        @DisplayName("deve cancelar pedido PENDING e publicar OrderCancelledEvent")
-        void shouldCancelOrderAndPublishEvent() {
-            when(orderRepository.findById(1L)).thenReturn(Optional.of(pendingOrder));
-            when(orderRepository.save(any())).thenReturn(pendingOrder);
+        @DisplayName("deve cancelar pedido PENDING e salvar evento no outbox")
+        void shouldCancelOrderAndSaveOutboxEvent() {
+            Order order = pendingOrder();
+            when(orderRepository.findByIdForUpdate(ORDER_ID)).thenReturn(Optional.of(order));
+            when(orderRepository.save(any())).thenReturn(order);
 
-            orderService.cancelOrder(1L, "Cancelado pelo usuário");
+            orderService.cancelOrder(ORDER_ID, "Cancelado pelo usuário");
 
-            assertThat(pendingOrder.getStatus()).isEqualTo(OrderStatus.CANCELLED);
-            verify(orderRepository).save(pendingOrder);
+            assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+            verify(orderRepository).save(order);
 
             ArgumentCaptor<OrderCancelledEvent> captor = ArgumentCaptor.forClass(OrderCancelledEvent.class);
-            verify(eventPublisher).publishOrderCancelled(captor.capture());
+            verify(outboxService).saveEvent(
+                    captor.capture(),
+                    eq(ORDER_ID.toString()),
+                    eq("ORDER_CANCELLED"),
+                    eq(MessagingConstants.ORDER_CANCELLED_ROUTING_KEY)
+            );
+
             OrderCancelledEvent event = captor.getValue();
-            assertThat(event.orderId()).isEqualTo(1L);
-            assertThat(event.userId()).isEqualTo(42L);
+            assertThat(event.orderId()).isEqualTo(ORDER_ID);
+            assertThat(event.userId()).isEqualTo(USER_ID);
             assertThat(event.reason()).isEqualTo("Cancelado pelo usuário");
         }
 
         @Test
         @DisplayName("deve lançar OrderNotFoundException quando pedido não existe")
         void shouldThrowWhenOrderNotFound() {
-            when(orderRepository.findById(99L)).thenReturn(Optional.empty());
+            when(orderRepository.findByIdForUpdate(99L)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> orderService.cancelOrder(99L, "motivo"))
                     .isInstanceOf(OrderNotFoundException.class);
 
-            verify(eventPublisher, never()).publishOrderCancelled(any());
+            verify(outboxService, never()).saveEvent(any(), any(), any(), any());
         }
 
         @Test
         @DisplayName("deve lançar InvalidOrderStatusException quando status não é PENDING")
         void shouldThrowWhenStatusIsNotPending() {
-            pendingOrder.setStatus(OrderStatus.CONFIRMED);
-            when(orderRepository.findById(1L)).thenReturn(Optional.of(pendingOrder));
+            Order confirmed = Order.builder()
+                    .id(ORDER_ID)
+                    .userId(USER_ID)
+                    .userEmail(USER_EMAIL)
+                    .status(OrderStatus.CONFIRMED)
+                    .totalAmount(new BigDecimal("299.90"))
+                    .items(List.of(ITEM))
+                    .createdAt(LocalDateTime.now())
+                    .updatedAt(LocalDateTime.now())
+                    .build();
+            when(orderRepository.findByIdForUpdate(ORDER_ID)).thenReturn(Optional.of(confirmed));
 
-            assertThatThrownBy(() -> orderService.cancelOrder(1L, "motivo"))
+            assertThatThrownBy(() -> orderService.cancelOrder(ORDER_ID, "motivo"))
                     .isInstanceOf(InvalidOrderStatusException.class)
                     .hasMessageContaining("cancelar");
 
-            verify(eventPublisher, never()).publishOrderCancelled(any());
+            verify(outboxService, never()).saveEvent(any(), any(), any(), any());
         }
 
         @Test
         @DisplayName("não deve cancelar pedido já CANCELLED")
         void shouldThrowWhenOrderIsAlreadyCancelled() {
-            pendingOrder.setStatus(OrderStatus.CANCELLED);
-            when(orderRepository.findById(1L)).thenReturn(Optional.of(pendingOrder));
+            Order cancelled = Order.builder()
+                    .id(ORDER_ID)
+                    .userId(USER_ID)
+                    .userEmail(USER_EMAIL)
+                    .status(OrderStatus.CANCELLED)
+                    .totalAmount(new BigDecimal("299.90"))
+                    .items(List.of(ITEM))
+                    .createdAt(LocalDateTime.now())
+                    .updatedAt(LocalDateTime.now())
+                    .build();
+            when(orderRepository.findByIdForUpdate(ORDER_ID)).thenReturn(Optional.of(cancelled));
 
-            assertThatThrownBy(() -> orderService.cancelOrder(1L, "motivo"))
+            assertThatThrownBy(() -> orderService.cancelOrder(ORDER_ID, "motivo"))
                     .isInstanceOf(InvalidOrderStatusException.class);
         }
     }

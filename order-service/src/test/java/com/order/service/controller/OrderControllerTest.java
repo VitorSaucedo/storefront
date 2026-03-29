@@ -3,6 +3,7 @@ package com.order.service.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.order.service.config.TestSecurityConfig;
 import com.order.service.dto.OrderItemRequest;
+import com.order.service.dto.OrderItemResponse;
 import com.order.service.dto.OrderRequest;
 import com.order.service.dto.OrderResponse;
 import com.order.service.exception.OrderNotFoundException;
@@ -57,24 +58,45 @@ class OrderControllerTest {
     void setUp() {
         objectMapper.findAndRegisterModules();
 
-        orderResponse = new OrderResponse(
-                1L,
-                42L,
-                "user@example.com",
-                OrderStatus.PENDING,
-                new BigDecimal("299.90"),
-                List.of(new OrderResponse.OrderItemResponse(10L, 2, new BigDecimal("149.95"))),
-                LocalDateTime.now(),
-                LocalDateTime.now()
-        );
+        orderResponse = buildOrderResponse(OrderStatus.PENDING);
 
         when(claimsExtractor.currentUserId()).thenReturn(42L);
         when(claimsExtractor.currentUserEmail()).thenReturn("user@example.com");
     }
 
-    // -------------------------------------------------------------------------
-    // GET /orders  (findMyOrders)
-    // -------------------------------------------------------------------------
+    private static OrderItemResponse buildItem() {
+        return new OrderItemResponse(10L, 2, new BigDecimal("149.95"));
+    }
+
+    private static OrderResponse buildOrderResponse(OrderStatus status) {
+        return new OrderResponse(
+                1L,
+                42L,
+                "user@example.com",
+                status,
+                new BigDecimal("299.90"),
+                List.of(buildItem()),
+                LocalDateTime.now(),
+                LocalDateTime.now()
+        );
+    }
+
+    private static OrderRequest buildValidOrderRequest() {
+        return OrderRequest.builder()
+                .items(List.of(buildValidOrderItemRequest()))
+                .build();
+    }
+
+    private static OrderItemRequest buildValidOrderItemRequest() {
+        return OrderItemRequest.builder()
+                .productId(10L)
+                .quantity(2)
+                .unitPrice(new BigDecimal("149.95"))
+                .build();
+    }
+
+    // ── GET /orders ───────────────────────────────────────────────────────────
+
     @Nested
     @DisplayName("GET /orders")
     class FindMyOrders {
@@ -113,9 +135,8 @@ class OrderControllerTest {
         }
     }
 
-    // -------------------------------------------------------------------------
-    // GET /orders/{id}
-    // -------------------------------------------------------------------------
+    // ── GET /orders/{id} ──────────────────────────────────────────────────────
+
     @Nested
     @DisplayName("GET /orders/{id}")
     class FindById {
@@ -151,23 +172,11 @@ class OrderControllerTest {
         }
     }
 
-    // -------------------------------------------------------------------------
-    // POST /orders
-    // -------------------------------------------------------------------------
+    // ── POST /orders ──────────────────────────────────────────────────────────
+
     @Nested
     @DisplayName("POST /orders")
     class Create {
-
-        private OrderRequest validRequest() {
-            OrderItemRequest item = new OrderItemRequest();
-            item.setProductId(10L);
-            item.setQuantity(2);
-            item.setUnitPrice(new BigDecimal("149.95"));
-
-            OrderRequest request = new OrderRequest();
-            request.setItems(List.of(item));
-            return request;
-        }
 
         @Test
         @WithMockUser
@@ -178,7 +187,7 @@ class OrderControllerTest {
 
             mockMvc.perform(post("/orders")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(validRequest())))
+                            .content(objectMapper.writeValueAsString(buildValidOrderRequest())))
                     .andExpect(status().isCreated())
                     .andExpect(jsonPath("$.id").value("1"))
                     .andExpect(jsonPath("$.status").value("PENDING"))
@@ -199,8 +208,9 @@ class OrderControllerTest {
         @WithMockUser
         @DisplayName("deve retornar 400 quando lista de itens está vazia")
         void shouldReturn400WhenItemsListIsEmpty() throws Exception {
-            OrderRequest request = new OrderRequest();
-            request.setItems(List.of());
+            OrderRequest request = OrderRequest.builder()
+                    .items(List.of())
+                    .build();
 
             mockMvc.perform(post("/orders")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -212,12 +222,12 @@ class OrderControllerTest {
         @WithMockUser
         @DisplayName("deve retornar 400 quando item não tem productId")
         void shouldReturn400WhenProductIdIsMissing() throws Exception {
-            OrderItemRequest item = new OrderItemRequest();
-            item.setQuantity(1);
-            item.setUnitPrice(new BigDecimal("99.00"));
-
-            OrderRequest request = new OrderRequest();
-            request.setItems(List.of(item));
+            OrderRequest request = OrderRequest.builder()
+                    .items(List.of(OrderItemRequest.builder()
+                            .quantity(1)
+                            .unitPrice(new BigDecimal("99.00"))
+                            .build()))
+                    .build();
 
             mockMvc.perform(post("/orders")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -229,13 +239,13 @@ class OrderControllerTest {
         @WithMockUser
         @DisplayName("deve retornar 400 quando quantidade é zero")
         void shouldReturn400WhenQuantityIsZero() throws Exception {
-            OrderItemRequest item = new OrderItemRequest();
-            item.setProductId(1L);
-            item.setQuantity(0);
-            item.setUnitPrice(new BigDecimal("99.00"));
-
-            OrderRequest request = new OrderRequest();
-            request.setItems(List.of(item));
+            OrderRequest request = OrderRequest.builder()
+                    .items(List.of(OrderItemRequest.builder()
+                            .productId(1L)
+                            .quantity(0)
+                            .unitPrice(new BigDecimal("99.00"))
+                            .build()))
+                    .build();
 
             mockMvc.perform(post("/orders")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -248,14 +258,13 @@ class OrderControllerTest {
         void shouldReturn401WhenUnauthenticated() throws Exception {
             mockMvc.perform(post("/orders")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(validRequest())))
+                            .content(objectMapper.writeValueAsString(buildValidOrderRequest())))
                     .andExpect(status().isUnauthorized());
         }
     }
 
-    // -------------------------------------------------------------------------
-    // PATCH /orders/{id}/cancel
-    // -------------------------------------------------------------------------
+    // ── PATCH /orders/{id}/cancel ─────────────────────────────────────────────
+
     @Nested
     @DisplayName("PATCH /orders/{id}/cancel")
     class Cancel {
@@ -264,14 +273,8 @@ class OrderControllerTest {
         @WithMockUser
         @DisplayName("deve retornar 200 com o pedido cancelado")
         void shouldReturn200WhenOrderCancelled() throws Exception {
-            OrderResponse cancelled = new OrderResponse(
-                    1L, 42L, "user@example.com", OrderStatus.CANCELLED,
-                    new BigDecimal("299.90"),
-                    List.of(new OrderResponse.OrderItemResponse(10L, 2, new BigDecimal("149.95"))),
-                    LocalDateTime.now(), LocalDateTime.now()
-            );
             doNothing().when(orderService).cancelOrder(eq(1L), anyString());
-            when(orderService.findById(1L)).thenReturn(cancelled);
+            when(orderService.findById(1L)).thenReturn(buildOrderResponse(OrderStatus.CANCELLED));
 
             mockMvc.perform(patch("/orders/1/cancel"))
                     .andExpect(status().isOk())
@@ -297,9 +300,8 @@ class OrderControllerTest {
         }
     }
 
-    // -------------------------------------------------------------------------
-    // GET /orders/all  (admin only)
-    // -------------------------------------------------------------------------
+    // ── GET /orders/all ───────────────────────────────────────────────────────
+
     @Nested
     @DisplayName("GET /orders/all")
     class FindAll {
