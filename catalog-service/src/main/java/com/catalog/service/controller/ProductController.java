@@ -60,6 +60,12 @@ public class ProductController {
         return ResponseEntity.ok(productService.findAllByIds(ids));
     }
 
+    @PostMapping("/reserve")
+    public ResponseEntity<Void> reserveStock(@RequestBody List<ProductService.ReservationItem> items) {
+        productService.reserveStock(items);
+        return ResponseEntity.ok().build();
+    }
+
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ProductResponse> update(@PathVariable Long id,

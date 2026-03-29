@@ -14,10 +14,12 @@ public final class MessagingConstants {
     public static final String ORDER_COMPENSATED_QUEUE = "order.compensated.queue";
     public static final String ORDER_CONFIRMED_QUEUE = "order.confirmed.queue";
     public static final String ORDER_CONFIRMED_DLQ = "order.confirmed.queue.dlq";
+    public static final String ORDER_CANCELLED_QUEUE = "catalog.order.cancelled.queue";
 
     // Routing Keys
     public static final String PRODUCT_UPDATED_ROUTING_KEY = "product.updated";
     public static final String ORDER_COMPENSATED_ROUTING_KEY = "order.compensated";
     public static final String ORDER_CONFIRMED_ROUTING_KEY = "order.confirmed";
     public static final String ORDER_CONFIRMED_DLQ_ROUTING_KEY = "order.confirmed.dead";
+    public static final String ORDER_CANCELLED_ROUTING_KEY = "order.cancelled";
 }

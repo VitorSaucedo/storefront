@@ -128,6 +128,23 @@ public class ProductService {
     }
 
     @Transactional
+    public void reserveStock(List<ReservationItem> items) {
+        for (ReservationItem item : items) {
+            Product product = productRepository.findByIdForUpdate(item.productId())
+                    .orElseThrow(() -> new ProductNotFoundException(item.productId()));
+
+            if (product.getStockQuantity() < item.quantity()) {
+                throw new InsufficientStockException(item.productId(),
+                        product.getStockQuantity(), item.quantity());
+            }
+
+            product.setStockQuantity(product.getStockQuantity() - item.quantity());
+            productRepository.save(product);
+            log.info("Estoque reservado: productId={}, quantidade={}", item.productId(), item.quantity());
+        }
+    }
+
+    @Transactional
     public void delete(Long id) {
         if (!productRepository.existsById(id)) {
             throw new ProductNotFoundException(id);
@@ -135,6 +152,8 @@ public class ProductService {
         productRepository.deleteById(id);
         log.info("Produto deletado: id={}", id);
     }
+
+    public record ReservationItem(Long productId, Integer quantity) {}
 
     private ProductResponse toResponse(Product product) {
         return ProductResponse.builder()

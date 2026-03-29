@@ -82,6 +82,19 @@ public class RabbitMQConfig {
     }
 
     @Bean
+    public Queue orderCancelledQueue() {
+        return new Queue(MessagingConstants.ORDER_CANCELLED_QUEUE, true);
+    }
+
+    @Bean
+    public Binding orderCancelledBinding() {
+        return BindingBuilder
+                .bind(orderCancelledQueue())
+                .to(orderExchange())
+                .with(MessagingConstants.ORDER_CANCELLED_ROUTING_KEY);
+    }
+
+    @Bean
     public JacksonJsonMessageConverter messageConverter() {
         return new JacksonJsonMessageConverter();
     }

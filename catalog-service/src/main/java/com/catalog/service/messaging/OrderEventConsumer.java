@@ -1,6 +1,8 @@
 package com.catalog.service.messaging;
 
 import com.catalog.service.config.MessagingConstants;
+import com.catalog.service.dto.OrderItem;
+import com.catalog.service.dto.events.OrderCancelledEvent;
 import com.catalog.service.dto.events.OrderCompensatedEvent;
 import com.catalog.service.dto.events.OrderConfirmedEvent;
 import com.catalog.service.service.ProductService;
@@ -10,7 +12,6 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 
 @Component
@@ -29,29 +30,21 @@ public class OrderEventConsumer {
 
     @RabbitListener(queues = MessagingConstants.ORDER_CONFIRMED_QUEUE)
     public void onOrderConfirmed(OrderConfirmedEvent event) {
-        log.info("Evento order.confirmed recebido: orderId={}", event.orderId());
+        log.info("Pedido confirmado com sucesso: orderId={}. Estoque já garantido na reserva.", event.orderId());
+    }
 
-        List<OrderConfirmedEvent.OrderItem> decremented = new ArrayList<>();
+    @RabbitListener(queues = MessagingConstants.ORDER_CANCELLED_QUEUE)
+    public void onOrderCancelled(OrderCancelledEvent event) {
+        log.info("Cancelamento recebido. Iniciando devolução de estoque para o pedido: {}", event.orderId());
 
-        for (OrderConfirmedEvent.OrderItem item : event.items()) {
+        for (OrderItem item : event.items()) {
             try {
-                productService.decrementStock(item.productId(), item.quantity());
-                decremented.add(item);
-                log.info("Estoque decrementado: productId={}, quantidade={}",
-                        item.productId(), item.quantity());
+                productService.incrementStock(item.productId(), item.quantity());
             } catch (Exception ex) {
-                log.error("Falha ao decrementar estoque: productId={}, orderId={}, erro={}",
+                log.error("Falha ao devolver estoque do produto {} do pedido {}: {}",
                         item.productId(), event.orderId(), ex.getMessage());
-
-                compensate(decremented, event.orderId());
-
-                throw new RuntimeException(
-                        "Falha no processamento do pedido orderId=" + event.orderId()
-                                + ", compensação aplicada.", ex);
             }
         }
-
-        log.info("Processamento do order.confirmed concluído: orderId={}", event.orderId());
     }
 
     private void compensate(List<OrderConfirmedEvent.OrderItem> decremented, Long orderId) {
