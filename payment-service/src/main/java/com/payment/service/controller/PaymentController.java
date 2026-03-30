@@ -24,7 +24,7 @@ public class PaymentController {
 
     @GetMapping("/user")
     public ResponseEntity<Page<PaymentResponse>> getMyPayments(
-            @PageableDefault(size = 10, sort = "createdAt") Pageable pageable) {
+            @PageableDefault(sort = "createdAt") Pageable pageable) {
         return ResponseEntity.ok(paymentService.getPaymentsByUser(claimsExtractor.currentUserId(), pageable));
     }
 
@@ -32,7 +32,7 @@ public class PaymentController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Page<PaymentResponse>> getPaymentsByUser(
             @PathVariable Long userId,
-            @PageableDefault(size = 10, sort = "createdAt") Pageable pageable) {
+            @PageableDefault(sort = "createdAt") Pageable pageable) {
         return ResponseEntity.ok(paymentService.getPaymentsByUser(userId, pageable));
     }
 
@@ -41,4 +41,3 @@ public class PaymentController {
         return ResponseEntity.ok(paymentService.getPaymentByOrder(orderId));
     }
 }
-

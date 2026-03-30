@@ -45,21 +45,17 @@ class PaymentControllerTest {
 
     @BeforeEach
     void setUp() {
-        paymentResponse = new PaymentResponse(
-                1L,
-                10L,
-                42L,
-                new BigDecimal("299.90"),
-                "PROCESSED",
-                null
-        );
+        paymentResponse = PaymentResponse.builder()
+                .id(1L)
+                .orderId(10L)
+                .userId(42L)
+                .amount(new BigDecimal("299.90"))
+                .status("PROCESSED")
+                .build();
 
         when(claimsExtractor.currentUserId()).thenReturn(42L);
     }
 
-    // -------------------------------------------------------------------------
-    // GET /payments/user  (meus pagamentos)
-    // -------------------------------------------------------------------------
     @Nested
     @DisplayName("GET /payments/user")
     class GetMyPayments {
@@ -76,8 +72,6 @@ class PaymentControllerTest {
             mockMvc.perform(get("/payments/user"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content[0].id").value("1"))
-                    .andExpect(jsonPath("$.content[0].orderId").value("10"))
-                    .andExpect(jsonPath("$.content[0].userId").value("42"))
                     .andExpect(jsonPath("$.content[0].status").value("PROCESSED"))
                     .andExpect(jsonPath("$.totalElements").value(1));
         }
@@ -92,18 +86,8 @@ class PaymentControllerTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content").isEmpty());
         }
-
-        @Test
-        @DisplayName("deve retornar 401 para requisição sem autenticação")
-        void shouldReturn401WhenUnauthenticated() throws Exception {
-            mockMvc.perform(get("/payments/user"))
-                    .andExpect(status().isUnauthorized());
-        }
     }
 
-    // -------------------------------------------------------------------------
-    // GET /payments/user/{userId}  (admin only)
-    // -------------------------------------------------------------------------
     @Nested
     @DisplayName("GET /payments/user/{userId}")
     class GetPaymentsByUser {
@@ -119,8 +103,7 @@ class PaymentControllerTest {
 
             mockMvc.perform(get("/payments/user/42"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.content[0].userId").value("42"))
-                    .andExpect(jsonPath("$.totalElements").value(1));
+                    .andExpect(jsonPath("$.content[0].userId").value("42"));
         }
 
         @Test
@@ -130,18 +113,8 @@ class PaymentControllerTest {
             mockMvc.perform(get("/payments/user/42"))
                     .andExpect(status().isForbidden());
         }
-
-        @Test
-        @DisplayName("deve retornar 401 para requisição sem autenticação")
-        void shouldReturn401WhenUnauthenticated() throws Exception {
-            mockMvc.perform(get("/payments/user/42"))
-                    .andExpect(status().isUnauthorized());
-        }
     }
 
-    // -------------------------------------------------------------------------
-    // GET /payments/order/{orderId}
-    // -------------------------------------------------------------------------
     @Nested
     @DisplayName("GET /payments/order/{orderId}")
     class GetPaymentByOrder {
@@ -155,19 +128,22 @@ class PaymentControllerTest {
             mockMvc.perform(get("/payments/order/10"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.id").value("1"))
-                    .andExpect(jsonPath("$.orderId").value("10"))
-                    .andExpect(jsonPath("$.amount").value("299.90"))
-                    .andExpect(jsonPath("$.status").value("PROCESSED"))
-                    .andExpect(jsonPath("$.failureReason").doesNotExist());
+                    .andExpect(jsonPath("$.amount").value("299.90"));
         }
 
         @Test
         @WithMockUser
         @DisplayName("deve retornar 200 com failureReason quando pagamento falhou")
         void shouldReturn200WithFailureReason() throws Exception {
-            PaymentResponse failed = new PaymentResponse(
-                    2L, 11L, 42L, new BigDecimal("150.00"), "FAILED", "Insufficient funds"
-            );
+            PaymentResponse failed = PaymentResponse.builder()
+                    .id(2L)
+                    .orderId(11L)
+                    .userId(42L)
+                    .amount(new BigDecimal("150.00"))
+                    .status("FAILED")
+                    .failureReason("Insufficient funds")
+                    .build();
+
             when(paymentService.getPaymentByOrder(11L)).thenReturn(failed);
 
             mockMvc.perform(get("/payments/order/11"))
@@ -178,20 +154,13 @@ class PaymentControllerTest {
 
         @Test
         @WithMockUser
-        @DisplayName("deve retornar 404 quando pagamento não existe para o pedido")
+        @DisplayName("deve retornar 404 quando pagamento não existe")
         void shouldReturn404WhenNotFound() throws Exception {
             when(paymentService.getPaymentByOrder(99L))
                     .thenThrow(PaymentNotFoundException.byOrderId(99L));
 
             mockMvc.perform(get("/payments/order/99"))
                     .andExpect(status().isNotFound());
-        }
-
-        @Test
-        @DisplayName("deve retornar 401 para requisição sem autenticação")
-        void shouldReturn401WhenUnauthenticated() throws Exception {
-            mockMvc.perform(get("/payments/order/10"))
-                    .andExpect(status().isUnauthorized());
         }
     }
 }

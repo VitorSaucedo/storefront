@@ -1,5 +1,6 @@
 package com.payment.service;
 
+import com.payment.service.repository.OutboxRepository;
 import com.payment.service.repository.PaymentRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -22,6 +23,9 @@ class PaymentServiceApplicationTests {
 
 	@MockitoBean
 	private ConnectionFactory connectionFactory;
+
+	@MockitoBean
+	private OutboxRepository outboxRepository;
 
 	@Test
 	void contextLoads() {}

@@ -1,5 +1,6 @@
 package com.payment.service.messaging;
 
+import com.payment.service.config.MessagingConstants;
 import com.payment.service.config.RabbitMQConfig;
 import com.payment.service.dto.events.OrderCreatedEvent;
 import com.payment.service.service.PaymentService;
@@ -19,7 +20,7 @@ public class OrderCreatedConsumer {
         this.paymentService = paymentService;
     }
 
-    @RabbitListener(queues = RabbitMQConfig.ORDER_CREATED_QUEUE)
+    @RabbitListener(queues = MessagingConstants.ORDER_CREATED_QUEUE)
     public void handleOrderCreated(OrderCreatedEvent event) {
         log.info("Received order.created: orderId={}, userId={}, amount={}",
                 event.orderId(), event.userId(), event.totalAmount());

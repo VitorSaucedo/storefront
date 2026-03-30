@@ -1,5 +1,6 @@
 package com.payment.service.messaging;
 
+import com.payment.service.config.MessagingConstants;
 import com.payment.service.config.RabbitMQConfig;
 import com.payment.service.dto.events.PaymentFailedEvent;
 import com.payment.service.dto.events.PaymentProcessedEvent;
@@ -22,8 +23,8 @@ public class PaymentEventPublisher {
     public void publishPaymentProcessed(PaymentProcessedEvent event) {
         log.info("Publishing payment.processed for orderId={}", event.orderId());
         rabbitTemplate.convertAndSend(
-                RabbitMQConfig.PAYMENT_EXCHANGE,
-                RabbitMQConfig.PAYMENT_PROCESSED_ROUTING_KEY,
+                MessagingConstants.PAYMENT_EXCHANGE,
+                MessagingConstants.PAYMENT_PROCESSED_ROUTING_KEY,
                 event
         );
     }
@@ -31,8 +32,8 @@ public class PaymentEventPublisher {
     public void publishPaymentFailed(PaymentFailedEvent event) {
         log.info("Publishing payment.failed for orderId={}", event.orderId());
         rabbitTemplate.convertAndSend(
-                RabbitMQConfig.PAYMENT_EXCHANGE,
-                RabbitMQConfig.PAYMENT_FAILED_ROUTING_KEY,
+                MessagingConstants.PAYMENT_EXCHANGE,
+                MessagingConstants.PAYMENT_FAILED_ROUTING_KEY,
                 event
         );
     }
