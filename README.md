@@ -14,10 +14,15 @@ Plataforma de e-commerce construída com arquitetura de microsserviços, comunic
 - [Eventos RabbitMQ](#eventos-rabbitmq)
 - [API Reference](#api-reference)
 - [Testes](#testes)
+- [CI/CD](#cicd)
 - [Configuração e Execução](#configuracao-e-execucao)
 - [Variáveis de Ambiente](#variaveis-de-ambiente)
+- [Monitoramento](#monitoramento)
+- [Segurança](#seguranca)
 - [Estrutura do Projeto](#estrutura-do-projeto)
 - [Frontend](#frontend)
+- [Contribuição](#contribuicao)
+- [Licença](#licenca)
 
 ---
 
@@ -72,31 +77,36 @@ O projeto implementa um sistema de e-commerce com as seguintes capacidades:
 
 Todos os serviços se comunicam exclusivamente através do API Gateway. A autenticação é validada no gateway, que injeta os headers `X-Auth-Username` e `X-Auth-Role` nas requisições para os serviços downstream — nenhum serviço expõe endpoint público diretamente.
 
+Nota sobre Resiliência: O sistema utiliza o padrão Circuit Breaker no API Gateway para evitar falhas em cascata, garantindo que instabilidades no order-service não comprometam a disponibilidade total da plataforma.
+
 ---
 
 ## Tecnologias
 
 ### Backend
-| Tecnologia | Versão | Uso |
-|---|---|---|
-| Java | 21+ | Linguagem principal |
-| Spring Boot | 4.0.3 | Framework base |
-| Spring Security | 6.4 | Autenticação e autorização |
-| Spring Cloud Gateway | 2025.x | API Gateway reativo |
-| Spring Data JPA | 4.x | Persistência |
-| Spring AMQP | 4.x | Mensageria RabbitMQ |
-| PostgreSQL | 16 | Banco de dados por serviço |
-| RabbitMQ | 3 | Message broker |
-| JWT (jjwt) | 0.13.x | Tokens de autenticação |
-| Docker / Docker Compose | — | Containerização |
+
+| Tecnologia              | Versão | Uso                                   |
+| ----------------------- | ------ | ------------------------------------- |
+| Java                    | 21+    | Linguagem principal                   |
+| Spring Boot             | 4.0.3  | Framework base                        |
+| Spring Security         | 6.4    | Autenticação e autorização            |
+| Spring Cloud Gateway    | 2025.x | API Gateway reativo                   |
+| Resilience4j            | 2025.x | Circuit Breaker e tolerância a falhas |
+| Spring Data JPA         | 4.x    | Persistência                          |
+| Spring AMQP             | 4.x    | Mensageria RabbitMQ                   |
+| PostgreSQL              | 16     | Banco de dados por serviço            |
+| RabbitMQ                | 3      | Message broker                        |
+| JWT (jjwt)              | 0.13.x | Tokens de autenticação                |
+| Docker / Docker Compose | —      | Containerização                       |
 
 ### Frontend
-| Tecnologia | Versão | Uso |
-|---|---|---|
-| React | 19 | UI |
-| TypeScript | 5.9 | Tipagem |
-| Vite | 7 | Build tool |
-| React Router | 7 | Roteamento |
+
+| Tecnologia   | Versão | Uso        |
+| ------------ | ------ | ---------- |
+| React        | 19     | UI         |
+| TypeScript   | 5.9    | Tipagem    |
+| Vite         | 7      | Build tool |
+| React Router | 7      | Roteamento |
 
 ---
 
@@ -111,15 +121,16 @@ Ponto de entrada único da plataforma. Implementa um `GlobalFilter` que:
 3. Valida a assinatura e expiração do JWT
 4. Injeta `X-Auth-Username` e `X-Auth-Role` nos headers da requisição encaminhada
 5. Retorna `401 Unauthorized` para tokens ausentes ou inválidos
+6. Resiliência: Implementa Circuit Breaker (orderServiceCB) para proteger o fluxo de pedidos, com redirecionamento para /fallback/orders em caso de indisponibilidade do serviço downstream
 
 **Tabela de roteamento:**
 
-| Prefixo | Destino |
-|---|---|
-| `/auth/**` | `auth-service:8081` |
-| `/products/**` | `catalog-service:8082` |
-| `/orders/**` | `order-service:8083` |
-| `/payments/**` | `payment-service:8084` |
+| Prefixo             | Destino                     |
+| ------------------- | --------------------------- |
+| `/auth/**`          | `auth-service:8081`         |
+| `/products/**`      | `catalog-service:8082`      |
+| `/orders/**`        | `order-service:8083`        |
+| `/payments/**`      | `payment-service:8084`      |
 | `/notifications/**` | `notification-service:8085` |
 
 ---
@@ -129,6 +140,7 @@ Ponto de entrada único da plataforma. Implementa um `GlobalFilter` que:
 Gerencia identidade e emissão de tokens. Banco de dados: `auth_db`.
 
 **Responsabilidades:**
+
 - Registro de novos usuários com validação de email único
 - Login com verificação de senha (BCrypt)
 - Geração de JWT com claims de `userId`, `email` e `role`
@@ -141,7 +153,7 @@ Gerencia identidade e emissão de tokens. Banco de dados: `auth_db`.
 >
 > ```bash
 > # Acessar o PostgreSQL do auth-service via Docker
-> docker exec -it microservices-postgres-auth-1 psql -U postgres -d auth_db
+> docker exec -it storefront-postgres-auth-1 psql -U postgres -d auth_db
 > ```
 >
 > ```sql
@@ -161,6 +173,7 @@ Gerencia identidade e emissão de tokens. Banco de dados: `auth_db`.
 Gerencia o catálogo de produtos e o controle de estoque. Banco de dados: `catalog_db`.
 
 **Responsabilidades:**
+
 - CRUD completo de produtos (criação e edição restritos a `ADMIN`)
 - Consultas por categoria e disponibilidade (estoque > 0)
 - Decremento de estoque ao confirmar pedido (consumindo `OrderConfirmedEvent`)
@@ -174,6 +187,7 @@ Gerencia o catálogo de produtos e o controle de estoque. Banco de dados: `catal
 Gerencia o ciclo de vida dos pedidos. Banco de dados: `order_db`.
 
 **Responsabilidades:**
+
 - Criação de pedido com validação de estoque via chamada síncrona ao catalog-service
 - Cálculo automático do total do pedido
 - Publicação de `OrderCreatedEvent` após criação
@@ -189,6 +203,7 @@ Gerencia o ciclo de vida dos pedidos. Banco de dados: `order_db`.
 Processa pagamentos de forma assíncrona. Banco de dados: `payment_db`.
 
 **Responsabilidades:**
+
 - Consumo de `OrderCreatedEvent` para iniciar o processamento
 - Simulação de processamento com taxa de sucesso de 80%
 - Publicação de `PaymentProcessedEvent` (sucesso) ou `PaymentFailedEvent` (falha)
@@ -204,6 +219,7 @@ Processa pagamentos de forma assíncrona. Banco de dados: `payment_db`.
 Serviço leve de notificações, sem banco de dados.
 
 **Responsabilidades:**
+
 - Consumo de `OrderConfirmedEvent`, `OrderCancelledEvent` e `PaymentFailedEvent`
 - Despacho de notificações ao usuário (atualmente via log estruturado; extensível para email/SMS/push)
 
@@ -246,14 +262,14 @@ Se o catalog-service falhar ao decrementar o estoque de um item após já ter pr
 
 ## Eventos RabbitMQ
 
-| Exchange | Routing Key | Evento | Publicador | Consumidor(es) |
-|---|---|---|---|---|
-| `auth.exchange` | `user.registered` | `UserRegisteredEvent` | auth-service | — |
-| `order.exchange` | `order.created` | `OrderCreatedEvent` | order-service | payment-service |
-| `order.exchange` | `order.confirmed` | `OrderConfirmedEvent` | order-service | catalog-service, notification-service |
-| `order.exchange` | `order.cancelled` | `OrderCancelledEvent` | order-service | notification-service |
-| `payment.exchange` | `payment.processed` | `PaymentProcessedEvent` | payment-service | order-service |
-| `payment.exchange` | `payment.failed` | `PaymentFailedEvent` | payment-service | order-service, notification-service |
+| Exchange           | Routing Key         | Evento                  | Publicador      | Consumidor(es)                        |
+| ------------------ | ------------------- | ----------------------- | --------------- | ------------------------------------- |
+| `auth.exchange`    | `user.registered`   | `UserRegisteredEvent`   | auth-service    | —                                     |
+| `order.exchange`   | `order.created`     | `OrderCreatedEvent`     | order-service   | payment-service                       |
+| `order.exchange`   | `order.confirmed`   | `OrderConfirmedEvent`   | order-service   | catalog-service, notification-service |
+| `order.exchange`   | `order.cancelled`   | `OrderCancelledEvent`   | order-service   | notification-service                  |
+| `payment.exchange` | `payment.processed` | `PaymentProcessedEvent` | payment-service | order-service                         |
+| `payment.exchange` | `payment.failed`    | `PaymentFailedEvent`    | payment-service | order-service, notification-service   |
 
 Todas as filas são duráveis (`durable=true`). A serialização de mensagens é feita em JSON via `JacksonJsonMessageConverter`.
 
@@ -267,13 +283,14 @@ Todas as filas são duráveis (`durable=true`). A serialização de mensagens é
 
 ### Autenticação
 
-| Método | Rota | Descrição |
-|---|---|---|
-| `POST` | `/auth/register` | Cadastra novo usuário |
-| `POST` | `/auth/login` | Autentica e retorna JWT |
-| `GET` | `/auth/users` 🔒👑 | Lista todos os usuários (paginado) |
+| Método | Rota               | Descrição                          |
+| ------ | ------------------ | ---------------------------------- |
+| `POST` | `/auth/register`   | Cadastra novo usuário              |
+| `POST` | `/auth/login`      | Autentica e retorna JWT            |
+| `GET`  | `/auth/users` 🔒👑 | Lista todos os usuários (paginado) |
 
 **POST /auth/register**
+
 ```json
 {
   "name": "João Silva",
@@ -283,6 +300,7 @@ Todas as filas são duráveis (`durable=true`). A serialização de mensagens é
 ```
 
 **POST /auth/login**
+
 ```json
 {
   "email": "joao@email.com",
@@ -291,6 +309,7 @@ Todas as filas são duráveis (`durable=true`). A serialização de mensagens é
 ```
 
 **Resposta (register / login):**
+
 ```json
 {
   "token": "eyJhbGciOiJIUzI1NiJ9...",
@@ -304,22 +323,23 @@ Todas as filas são duráveis (`durable=true`). A serialização de mensagens é
 
 ### Produtos
 
-| Método | Rota | Descrição |
-|---|---|---|
-| `GET` | `/products` 🔒 | Lista todos os produtos (paginado) |
-| `GET` | `/products/available` 🔒 | Lista produtos com estoque > 0 |
-| `GET` | `/products/category/{category}` 🔒 | Filtra por categoria |
-| `GET` | `/products/{id}` 🔒 | Busca produto por ID |
-| `POST` | `/products` 🔒👑 | Cria novo produto |
-| `PUT` | `/products/{id}` 🔒👑 | Atualiza produto |
-| `DELETE` | `/products/{id}` 🔒👑 | Remove produto |
+| Método   | Rota                               | Descrição                          |
+| -------- | ---------------------------------- | ---------------------------------- |
+| `GET`    | `/products` 🔒                     | Lista todos os produtos (paginado) |
+| `GET`    | `/products/available` 🔒           | Lista produtos com estoque > 0     |
+| `GET`    | `/products/category/{category}` 🔒 | Filtra por categoria               |
+| `GET`    | `/products/{id}` 🔒                | Busca produto por ID               |
+| `POST`   | `/products` 🔒👑                   | Cria novo produto                  |
+| `PUT`    | `/products/{id}` 🔒👑              | Atualiza produto                   |
+| `DELETE` | `/products/{id}` 🔒👑              | Remove produto                     |
 
 **POST / PUT /products — body:**
+
 ```json
 {
   "name": "Teclado Mecânico",
   "description": "Switch Cherry MX Red, RGB",
-  "price": 459.90,
+  "price": 459.9,
   "stockQuantity": 50,
   "category": "Periféricos",
   "imageUrl": "https://exemplo.com/teclado.jpg"
@@ -330,38 +350,38 @@ Todas as filas são duráveis (`durable=true`). A serialização de mensagens é
 
 ### Pedidos
 
-| Método | Rota | Descrição |
-|---|---|---|
-| `GET` | `/orders` 🔒 | Lista pedidos do usuário autenticado |
-| `GET` | `/orders/{id}` 🔒 | Busca pedido por ID |
-| `POST` | `/orders` 🔒 | Cria novo pedido |
-| `PATCH` | `/orders/{id}/cancel` 🔒 | Cancela pedido (somente `PENDING`) |
-| `GET` | `/orders/all` 🔒👑 | Lista todos os pedidos |
+| Método  | Rota                     | Descrição                            |
+| ------- | ------------------------ | ------------------------------------ |
+| `GET`   | `/orders` 🔒             | Lista pedidos do usuário autenticado |
+| `GET`   | `/orders/{id}` 🔒        | Busca pedido por ID                  |
+| `POST`  | `/orders` 🔒             | Cria novo pedido                     |
+| `PATCH` | `/orders/{id}/cancel` 🔒 | Cancela pedido (somente `PENDING`)   |
+| `GET`   | `/orders/all` 🔒👑       | Lista todos os pedidos               |
 
 **POST /orders — body:**
+
 ```json
 {
   "items": [
     {
       "productId": 1,
       "quantity": 2,
-      "unitPrice": 459.90
+      "unitPrice": 459.9
     }
   ]
 }
 ```
 
 **Resposta:**
+
 ```json
 {
   "id": 42,
   "userId": 7,
   "userEmail": "joao@email.com",
   "status": "PENDING",
-  "totalAmount": 919.80,
-  "items": [
-    { "productId": 1, "quantity": 2, "unitPrice": 459.90 }
-  ],
+  "totalAmount": 919.8,
+  "items": [{ "productId": 1, "quantity": 2, "unitPrice": 459.9 }],
   "createdAt": "2025-03-15T10:00:00",
   "updatedAt": "2025-03-15T10:00:00"
 }
@@ -371,11 +391,11 @@ Todas as filas são duráveis (`durable=true`). A serialização de mensagens é
 
 ### Pagamentos
 
-| Método | Rota | Descrição |
-|---|---|---|
-| `GET` | `/payments/user` 🔒 | Pagamentos do usuário autenticado |
-| `GET` | `/payments/user/{userId}` 🔒👑 | Pagamentos de um usuário específico |
-| `GET` | `/payments/order/{orderId}` 🔒 | Pagamento de um pedido específico |
+| Método | Rota                           | Descrição                           |
+| ------ | ------------------------------ | ----------------------------------- |
+| `GET`  | `/payments/user` 🔒            | Pagamentos do usuário autenticado   |
+| `GET`  | `/payments/user/{userId}` 🔒👑 | Pagamentos de um usuário específico |
+| `GET`  | `/payments/order/{orderId}` 🔒 | Pagamento de um pedido específico   |
 
 ---
 
@@ -402,50 +422,50 @@ mvn test --projects auth-service,catalog-service,order-service,payment-service,n
 
 #### API Gateway
 
-| Classe | Tipo | Cenários cobertos |
-|---|---|---|
-| `JwtUtilTest` | Unitário | `extractClaims` (token válido, expirado, assinatura inválida, malformado); `isValid` (true/false para cada caso); `extractUsername`; `extractRole` (com e sem claim) |
+| Classe                        | Tipo     | Cenários cobertos                                                                                                                                                                             |
+| ----------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `JwtUtilTest`                 | Unitário | `extractClaims` (token válido, expirado, assinatura inválida, malformado); `isValid` (true/false para cada caso); `extractUsername`; `extractRole` (com e sem claim)                          |
 | `JwtAuthenticationFilterTest` | Unitário | Paths públicos passam sem token; 401 para header ausente e formato incorreto; 401 para token inválido e expirado; propagação correta de `X-Auth-Username` e `X-Auth-Role`; `getOrder() == -1` |
 
 #### Auth Service
 
-| Classe | Tipo | Cenários cobertos |
-|---|---|---|
-| `JwtServiceTest` | Unitário | Geração de token com claims corretos; extração de username e role; validação (válido, expirado, assinatura inválida) |
-| `AuthServiceTest` | Unitário | Registro com sucesso e publicação de evento; e-mail duplicado lança exceção; login correto retorna token; senha incorreta lança exceção; busca de usuário existente e inexistente |
+| Classe               | Tipo          | Cenários cobertos                                                                                                                                                                          |
+| -------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `JwtServiceTest`     | Unitário      | Geração de token com claims corretos; extração de username e role; validação (válido, expirado, assinatura inválida)                                                                       |
+| `AuthServiceTest`    | Unitário      | Registro com sucesso e publicação de evento; e-mail duplicado lança exceção; login correto retorna token; senha incorreta lança exceção; busca de usuário existente e inexistente          |
 | `AuthControllerTest` | `@WebMvcTest` | `POST /auth/register` — 200, 400 body inválido, 409 e-mail duplicado; `POST /auth/login` — 200, 401 credenciais inválidas; `GET /auth/users` — 200 para ADMIN, 403 para USER, 401 sem auth |
 
 #### Catalog Service
 
-| Classe | Tipo | Cenários cobertos |
-|---|---|---|
-| `ProductServiceTest` | Unitário | `findAll`, `findAvailable`, `findByCategory` (paginados); `findById` — encontrado e `ProductNotFoundException`; `create` — sucesso e publicação de evento; `update` — sucesso, produto não encontrado; `delete` — sucesso, produto não encontrado; `decrementStock` — sucesso, estoque insuficiente, produto não encontrado |
+| Classe                  | Tipo          | Cenários cobertos                                                                                                                                                                                                                                                                                                                         |
+| ----------------------- | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ProductServiceTest`    | Unitário      | `findAll`, `findAvailable`, `findByCategory` (paginados); `findById` — encontrado e `ProductNotFoundException`; `create` — sucesso e publicação de evento; `update` — sucesso, produto não encontrado; `delete` — sucesso, produto não encontrado; `decrementStock` — sucesso, estoque insuficiente, produto não encontrado               |
 | `ProductControllerTest` | `@WebMvcTest` | `GET /products` — 200 com página, vazia, 401; `GET /products/available` — 200, vazia; `GET /products/category/{category}` — 200, vazia, 401; `GET /products/{id}` — 200, 404, 401; `POST /products` — 201 (ADMIN), 400 inválido, 403 (USER), 401; `PUT /products/{id}` — 200, 404, 403, 401; `DELETE /products/{id}` — 204, 404, 403, 401 |
 
 #### Order Service
 
-| Classe | Tipo | Cenários cobertos |
-|---|---|---|
-| `OrderServiceTest` | Unitário | `findByUserId` — paginado, vazio; `findById` — encontrado, `OrderNotFoundException`; `findAll` — paginado; `create` — sucesso + evento + cálculo de total, produto não encontrado, estoque insuficiente, sem evento quando save falha; `confirmOrder` — sucesso + evento, não encontrado, status inválido (CONFIRMED, CANCELLED); `cancelOrder` — sucesso + evento com reason, não encontrado, status inválido |
-| `OrderControllerTest` | `@WebMvcTest` | `GET /orders` — 200 com página, vazia, 401; `GET /orders/{id}` — 200, 404, 401; `POST /orders` — 201, 400 body vazio, 400 items vazio, 400 sem productId, 400 quantity zero, 401; `PATCH /orders/{id}/cancel` — 200, 404, 401; `GET /orders/all` — 200 (ADMIN), 403 (USER), 401 |
+| Classe                | Tipo          | Cenários cobertos                                                                                                                                                                                                                                                                                                                                                                                              |
+| --------------------- | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `OrderServiceTest`    | Unitário      | `findByUserId` — paginado, vazio; `findById` — encontrado, `OrderNotFoundException`; `findAll` — paginado; `create` — sucesso + evento + cálculo de total, produto não encontrado, estoque insuficiente, sem evento quando save falha; `confirmOrder` — sucesso + evento, não encontrado, status inválido (CONFIRMED, CANCELLED); `cancelOrder` — sucesso + evento com reason, não encontrado, status inválido |
+| `OrderControllerTest` | `@WebMvcTest` | `GET /orders` — 200 com página, vazia, 401; `GET /orders/{id}` — 200, 404, 401; `POST /orders` — 201, 400 body vazio, 400 items vazio, 400 sem productId, 400 quantity zero, 401; `PATCH /orders/{id}/cancel` — 200, 404, 401; `GET /orders/all` — 200 (ADMIN), 403 (USER), 401                                                                                                                                |
 
 > **Nota:** o `GlobalExceptionHandler` do order-service foi corrigido para tratar `AccessDeniedException` e `AuthorizationDeniedException` com status 403 em vez de 500. O mesmo ajuste foi aplicado ao payment-service.
 
 #### Payment Service
 
-| Classe | Tipo | Cenários cobertos |
-|---|---|---|
-| `PaymentServiceTest` | Unitário | `processPayment` — criação do pagamento, publicação de exatamente um evento por chamada, idempotência (pedido duplicado ignorado), dados corretos no `PaymentProcessedEvent`, dados corretos no `PaymentFailedEvent`; `getPaymentsByUser` — paginado, vazio; `getPaymentByOrder` — encontrado (PROCESSED), encontrado (FAILED com reason), `PaymentNotFoundException` |
-| `PaymentControllerTest` | `@WebMvcTest` | `GET /payments/user` — 200 com página, vazia, 401; `GET /payments/user/{userId}` — 200 (ADMIN), 403 (USER), 401; `GET /payments/order/{orderId}` — 200 PROCESSED, 200 FAILED com failureReason, 404, 401 |
+| Classe                  | Tipo          | Cenários cobertos                                                                                                                                                                                                                                                                                                                                                     |
+| ----------------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PaymentServiceTest`    | Unitário      | `processPayment` — criação do pagamento, publicação de exatamente um evento por chamada, idempotência (pedido duplicado ignorado), dados corretos no `PaymentProcessedEvent`, dados corretos no `PaymentFailedEvent`; `getPaymentsByUser` — paginado, vazio; `getPaymentByOrder` — encontrado (PROCESSED), encontrado (FAILED com reason), `PaymentNotFoundException` |
+| `PaymentControllerTest` | `@WebMvcTest` | `GET /payments/user` — 200 com página, vazia, 401; `GET /payments/user/{userId}` — 200 (ADMIN), 403 (USER), 401; `GET /payments/order/{orderId}` — 200 PROCESSED, 200 FAILED com failureReason, 404, 401                                                                                                                                                              |
 
 #### Notification Service
 
-| Classe | Tipo | Cenários cobertos |
-|---|---|---|
-| `NotificationServiceTest` | Unitário | `notifyOrderConfirmed` — log INFO com orderId, userId e totalAmount; `notifyOrderCancelled` — log INFO com orderId, userId e reason; `notifyPaymentFailed` — log INFO com orderId, userId e reason; exatamente um log por chamada em cada método |
-| `NotificationListenerTest` | Unitário | `onOrderConfirmed` delega ao service com o evento correto; `onOrderCancelled` delega ao service com o evento correto; `onPaymentFailed` delega ao service com o evento correto; nenhuma interação adicional com o service |
-| `JwtUtilTest` | Unitário | `extractClaims`, `extractUsername`, `isTokenValid` — token válido, expirado, assinatura inválida |
-| `JwtAuthFilterTest` | Unitário | Sem header passa adiante; header inválido retorna 401; token inválido retorna 401; token válido popula `SecurityContext` com username e authorities |
+| Classe                     | Tipo     | Cenários cobertos                                                                                                                                                                                                                                |
+| -------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `NotificationServiceTest`  | Unitário | `notifyOrderConfirmed` — log INFO com orderId, userId e totalAmount; `notifyOrderCancelled` — log INFO com orderId, userId e reason; `notifyPaymentFailed` — log INFO com orderId, userId e reason; exatamente um log por chamada em cada método |
+| `NotificationListenerTest` | Unitário | `onOrderConfirmed` delega ao service com o evento correto; `onOrderCancelled` delega ao service com o evento correto; `onPaymentFailed` delega ao service com o evento correto; nenhuma interação adicional com o service                        |
+| `JwtUtilTest`              | Unitário | `extractClaims`, `extractUsername`, `isTokenValid` — token válido, expirado, assinatura inválida                                                                                                                                                 |
+| `JwtAuthFilterTest`        | Unitário | Sem header passa adiante; header inválido retorna 401; token inválido retorna 401; token válido popula `SecurityContext` com username e authorities                                                                                              |
 
 ---
 
@@ -456,6 +476,7 @@ Cada serviço com controller possui uma `TestSecurityConfig` em `src/test/java/.
 
 **Serialização de paginação**
 O formato do JSON paginado varia conforme a presença de `@EnableSpringDataWebSupport(pageSerializationMode = VIA_DTO)` na aplicação:
+
 - **Com** essa anotação (catalog-service): `$.page.totalElements`
 - **Sem** essa anotação (order-service, payment-service): `$.totalElements` na raiz
 
@@ -470,6 +491,26 @@ Como o serviço não tem dependências externas (apenas escreve logs), os testes
 
 **Gateway reativo (`WebFlux`)**
 O api-gateway usa Spring Cloud Gateway (reativo). Os testes do filtro usam `MockServerHttpRequest` + `MockServerWebExchange` + `StepVerifier` do Reactor em vez de `MockMvc`. A captura do exchange mutado pelo filtro usa `ServerWebExchange` (interface) em vez da classe concreta de mock, pois `exchange.mutate().build()` retorna um `MutativeDecorator`, não o objeto original.
+
+---
+
+## CI/CD
+
+O projeto utiliza GitHub Actions para integração e entrega contínua. O pipeline é executado automaticamente em pushes para a branch `main` e inclui:
+
+### Jobs do Pipeline
+
+1. **Testes Paralelos**: Executa suítes de testes unitários e de integração para cada microsserviço em paralelo
+2. **Build de Imagens Docker**: Constrói imagens Docker para todos os serviços após testes aprovados
+3. **Frontend CI**: Realiza type-check e build de produção do frontend React
+4. **Smoke Test**: Sobe o ambiente completo via Docker Compose e verifica a saúde de todos os serviços através dos endpoints `/actuator/health`
+
+### Funcionalidades
+
+- **Relatórios de Testes**: Artefatos de relatórios Surefire são publicados para análise
+- **Cache Maven**: Acelera builds reutilizando dependências
+- **Cache Docker**: Otimiza builds de imagens com GitHub Actions Cache
+- **Verificação de Saúde**: Garante que todos os serviços iniciem corretamente antes de aprovar o pipeline
 
 ---
 
@@ -519,21 +560,21 @@ docker compose down -v
 
 ### Acessos
 
-| Serviço | URL |
-|---|---|
-| API Gateway | http://localhost:8080 |
-| Frontend | http://localhost:5173 (dev) |
-| RabbitMQ Management | http://localhost:15672 (guest/guest) |
-| auth-service (direto) | http://localhost:8081 |
-| catalog-service (direto) | http://localhost:8082 |
-| order-service (direto) | http://localhost:8083 |
-| payment-service (direto) | http://localhost:8084 |
-| notification-service (direto) | http://localhost:8085 |
+| Serviço                       | URL                                  |
+| ----------------------------- | ------------------------------------ |
+| API Gateway                   | http://localhost:8080                |
+| Frontend                      | http://localhost:3000 (dev)          |
+| RabbitMQ Management           | http://localhost:15672 (guest/guest) |
+| auth-service (direto)         | http://localhost:8081                |
+| catalog-service (direto)      | http://localhost:8082                |
+| order-service (direto)        | http://localhost:8083                |
+| payment-service (direto)      | http://localhost:8084                |
+| notification-service (direto) | http://localhost:8085                |
 
 ### Executando o frontend em modo desenvolvimento
 
 ```bash
-cd frontend
+cd frontend-ecommerce
 npm install
 npm run dev
 ```
@@ -556,24 +597,90 @@ curl http://localhost:8081/actuator/health
 
 As configurações sensíveis são centralizadas nos arquivos `application.properties` de cada serviço. Para ambientes de produção, substitua os valores abaixo via variáveis de ambiente ou secrets manager.
 
-| Variável | Padrão | Descrição |
-|---|---|---|
-| `JWT_SECRET` | `3f8a2b1c...` | Chave HMAC para assinatura JWT (compartilhada entre todos os serviços) |
-| `JWT_EXPIRATION` | `86400000` | Expiração do token em ms (24h) |
-| `SPRING_DATASOURCE_USERNAME` | `postgres` | Usuário do PostgreSQL |
-| `SPRING_DATASOURCE_PASSWORD` | `postgres` | Senha do PostgreSQL |
-| `SPRING_RABBITMQ_USERNAME` | `guest` | Usuário do RabbitMQ |
-| `SPRING_RABBITMQ_PASSWORD` | `guest` | Senha do RabbitMQ |
+| Variável                     | Padrão        | Descrição                                                              |
+| ---------------------------- | ------------- | ---------------------------------------------------------------------- |
+| `JWT_SECRET`                 | `3f8a2b1c...` | Chave HMAC para assinatura JWT (compartilhada entre todos os serviços) |
+| `JWT_EXPIRATION`             | `86400000`    | Expiração do token em ms (24h)                                         |
+| `SPRING_DATASOURCE_USERNAME` | `postgres`    | Usuário do PostgreSQL                                                  |
+| `SPRING_DATASOURCE_PASSWORD` | `postgres`    | Senha do PostgreSQL                                                    |
+| `SPRING_RABBITMQ_USERNAME`   | `guest`       | Usuário do RabbitMQ                                                    |
+| `SPRING_RABBITMQ_PASSWORD`   | `guest`       | Senha do RabbitMQ                                                      |
 
 ### Perfis disponíveis
 
-| Perfil | Arquivo | Uso |
-|---|---|---|
-| (padrão) | `application.properties` | Desenvolvimento local com Docker |
-| `docker` | `application-docker.properties` | Containers com hostnames do Compose |
-| `test` | `application-test.properties` | Testes com H2 in-memory (auth-service) |
+| Perfil   | Arquivo                         | Uso                                    |
+| -------- | ------------------------------- | -------------------------------------- |
+| (padrão) | `application.properties`        | Desenvolvimento local com Docker       |
+| `docker` | `application-docker.properties` | Containers com hostnames do Compose    |
+| `test`   | `application-test.properties`   | Testes com H2 in-memory (auth-service) |
 
 Para ativar um perfil: `SPRING_PROFILES_ACTIVE=docker`
+
+---
+
+## Monitoramento
+
+Todos os serviços expõem endpoints do Spring Boot Actuator para monitoramento e observabilidade:
+
+### Endpoints Disponíveis
+
+| Endpoint            | Descrição                                       | Porta |
+| ------------------- | ----------------------------------------------- | ----- |
+| `/actuator/health`  | Status de saúde do serviço                      | Todas |
+| `/actuator/info`    | Informações gerais do serviço                   | Todas |
+| `/actuator/metrics` | Métricas JVM e aplicação                        | Todas |
+| `/actuator/loggers` | Configuração de logging em runtime              | Todas |
+| `/actuator/env`     | Propriedades de ambiente (sensíveis mascaradas) | Todas |
+
+### Health Checks
+
+- **Database**: Verifica conectividade com PostgreSQL
+- **RabbitMQ**: Verifica conectividade com message broker
+- **Disk Space**: Alerta quando espaço em disco baixo
+- **Custom**: Validações específicas por serviço (ex: estoque mínimo)
+
+### Métricas
+
+- **JVM**: Uso de memória, GC, threads
+- **HTTP**: Taxas de requests, latência, erros
+- **RabbitMQ**: Mensagens processadas, filas pendentes
+- **Database**: Conexões ativas, queries lentas
+
+---
+
+## Segurança
+
+### Autenticação e Autorização
+
+- **JWT Tokens**: Assinados com HMAC-SHA256, expirados em 24h
+- **Roles**: `USER` (padrão) e `ADMIN`
+- **API Gateway**: Ponto único de validação, injeta headers `X-Auth-Username` e `X-Auth-Role`
+- **Proteção CSRF**: Desabilitada para APIs REST (stateless)
+
+### Headers de Segurança
+
+O API Gateway adiciona headers de segurança em todas as respostas:
+
+```
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+X-XSS-Protection: 1; mode=block
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+Content-Security-Policy: default-src 'self'
+```
+
+### Validações
+
+- **Input Sanitization**: Validação de entrada com Bean Validation
+- **SQL Injection**: Prevenção via JPA Criteria API e prepared statements
+- **XSS**: Sanitização no frontend e validação no backend
+- **Rate Limiting**: Implementado no API Gateway via Resilience4j
+
+### Secrets Management
+
+- **JWT Secret**: Deve ser único por ambiente, armazenado em secrets manager
+- **Database Credentials**: Nunca em código, sempre via variáveis de ambiente
+- **RabbitMQ Credentials**: Padrão `guest/guest` apenas para desenvolvimento
 
 ---
 
@@ -610,7 +717,7 @@ microservices/
 ├── order-service/          # estrutura análoga ao auth-service
 ├── payment-service/        # estrutura análoga ao auth-service
 ├── notification-service/   # estrutura análoga ao auth-service
-└── frontend/
+└── frontend-ecommerce/
     ├── index.html
     ├── package.json
     ├── vite.config.ts
@@ -629,15 +736,15 @@ A interface é uma SPA (Single Page Application) que se comunica exclusivamente 
 
 ### Páginas por role
 
-| Página | Role | Descrição |
-|---|---|---|
-| `/` (AuthPage) | público | Login e cadastro |
-| `/store` | USER | Vitrine de produtos com carrinho |
-| `/my-orders` | USER | Pedidos e histórico do usuário |
-| `/payments` | USER | Histórico de pagamentos |
-| `/dashboard` | ADMIN | Visão geral do sistema |
-| `/products` | ADMIN | CRUD de produtos |
-| `/orders` | ADMIN | Todos os pedidos com ações |
+| Página         | Role    | Descrição                        |
+| -------------- | ------- | -------------------------------- |
+| `/` (AuthPage) | público | Login e cadastro                 |
+| `/store`       | USER    | Vitrine de produtos com carrinho |
+| `/my-orders`   | USER    | Pedidos e histórico do usuário   |
+| `/payments`    | USER    | Histórico de pagamentos          |
+| `/dashboard`   | ADMIN   | Visão geral do sistema           |
+| `/products`    | ADMIN   | CRUD de produtos                 |
+| `/orders`      | ADMIN   | Todos os pedidos com ações       |
 
 ### Fluxo de compra no frontend
 
@@ -649,3 +756,11 @@ A interface é uma SPA (Single Page Application) que se comunica exclusivamente 
 ### Autenticação
 
 O `AuthContext` armazena o token em memória (não em `localStorage`) e o injeta automaticamente em todas as requisições via `apiFetch`. Em caso de `401`, o handler global desloga o usuário e redireciona para a tela de login.
+
+---
+
+## Licença
+
+Este projeto está licenciado sob a [MIT License](LICENSE).
+
+A licença MIT permite uso, modificação, distribuição e venda do software, desde que o aviso de copyright e a permissão sejam incluídos em todas as cópias ou partes substanciais do software.

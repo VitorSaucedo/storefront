@@ -93,6 +93,10 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
             return true;
         }
 
+        if (path.startsWith("/payments/user/")) {
+            return true;
+        }
+
         if (path.startsWith("/products") && method != HttpMethod.GET) {
             return true;
         }
